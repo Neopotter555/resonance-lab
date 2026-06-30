@@ -1,0 +1,125 @@
+export type LanguageCode =
+  | "en"
+  | "th"
+  | "zh"
+  | "ja"
+  | "ko"
+  | "es"
+  | "de"
+  | "fr";
+
+export type ThemeMode = "light" | "dark" | "system";
+
+export type FrequencyMode = "pure" | "binaural" | "isochronic";
+
+export type SoundscapeType = "white" | "pink" | "brown" | "rain";
+
+export type EvidenceLevel =
+  | "Research-supported"
+  | "Hypothesis"
+  | "Historical spiritual teaching"
+  | "User experience";
+
+export type FrequencyPresetGroup =
+  | "Solfeggio-style frequencies"
+  | "Schumann and Earth resonance"
+  | "10 beat-building frequencies"
+  | "Bentov-inspired experiment frequencies";
+
+export interface FrequencyChoice {
+  id: string;
+  group: FrequencyPresetGroup;
+  label: string;
+  frequency: number;
+  target: "carrier" | "beat" | "root" | "layer";
+  evidence: EvidenceLevel;
+  note: string;
+}
+
+export interface FrequencyLayer {
+  id: string;
+  label: string;
+  frequency: number;
+  volume: number;
+  pan: number;
+  waveform: OscillatorType;
+  enabled: boolean;
+  note: string;
+}
+
+export interface BinauralConfig {
+  carrier: number;
+  beat: number;
+  volume: number;
+}
+
+export interface IsochronicConfig {
+  carrier: number;
+  pulse: number;
+  volume: number;
+}
+
+export interface SoundscapeConfig {
+  enabled: boolean;
+  type: SoundscapeType;
+  volume: number;
+}
+
+export interface RelaxMusicConfig {
+  enabled: boolean;
+  rootFrequency: number;
+  volume: number;
+  warmth: number;
+}
+
+export interface FrequencyPreset {
+  id: string;
+  title: string;
+  createdAt: string;
+  mode: FrequencyMode;
+  layers: FrequencyLayer[];
+  binaural: BinauralConfig;
+  isochronic: IsochronicConfig;
+  soundscape: SoundscapeConfig;
+  relaxMusic: RelaxMusicConfig;
+}
+
+export interface SessionProtocol {
+  id: string;
+  title: string;
+  module: string;
+  durationMinutes: number;
+  breathRate: number;
+  intention: string;
+  affirmation: string;
+  visualization: string;
+  mode: FrequencyMode;
+}
+
+export interface JournalEntry {
+  id: string;
+  createdAt: string;
+  protocolTitle: string;
+  moodBefore: number;
+  moodAfter: number;
+  focus: number;
+  energy: number;
+  sleepQuality: number;
+  stressPerception: number;
+  notes: string;
+}
+
+export interface AssistantMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  provider?: string;
+  sections?: Record<EvidenceLevel, string>;
+}
+
+export interface ResearchItem {
+  title: string;
+  level: EvidenceLevel;
+  summary: string;
+  usage: string;
+}

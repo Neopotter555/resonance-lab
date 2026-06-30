@@ -1,36 +1,61 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Resonance Lab
+
+Resonance Lab is a personal frequency, meditation, visualization, journaling, and consciousness experimentation laboratory.
+
+It is for education, self-observation, meditation, relaxation, creativity, and experimentation only. It does not make medical, diagnostic, disease-treatment, or cure claims, and it does not replace professional medical care.
 
 ## Getting Started
 
-First, run the development server:
+Run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Features
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Frequency generator from 1 Hz to 20,000 Hz
+- Grouped frequency library dropdown for Solfeggio-style, Schumann, beat-building, and Bentov-inspired presets
+- Pure tone layering
+- Binaural beat engine
+- Isochronic pulse engine
+- Generated ambient soundscapes
+- Relax background music bed that starts with the audio session
+- Real-time waveform and spectrum visualization
+- Three.js visualization field
+- Breath pacing, meditation timer, and session builder
+- Guided visualization and affirmation editor
+- Local frequency preset saving/loading
+- Research journal with subjective trend tracking
+- Analytics dashboard
+- Biofeedback simulator fallback
+- NestJS API scaffold
+- Local scheduler, habit check-ins, community protocol library, and AI journey prompt flow
+- AI research assistant route with safety fallback
+- Evidence labels for research, hypotheses, spiritual teachings, and user experiences
+- Multi-language interface starter
+- Light, dark, and system themes
+- Demo-safe local browser persistence
 
-## Learn More
+## Validation
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run validate
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Documentation
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Architecture: `docs/ARCHITECTURE.md`
+- Deployment: `docs/DEPLOYMENT.md`
+- PostgreSQL schema: `database/schema.sql`
 
-## Deploy on Vercel
+## Deployment
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npm run deploy:netlify
+npm run deploy:vercel
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See `docs/DEPLOYMENT.md` for environment variables and smoke-test steps.
