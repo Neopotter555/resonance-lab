@@ -21,7 +21,7 @@ export function FrequencyField({ intensity, modeLabel }: FrequencyFieldProps) {
     if (!mount) return;
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x07111f, 4, 14);
+    scene.fog = new THREE.Fog(0x050402, 4, 14);
 
     const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 100);
     camera.position.set(0, 0.2, 6);
@@ -53,7 +53,7 @@ export function FrequencyField({ intensity, modeLabel }: FrequencyFieldProps) {
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
 
     const material = new THREE.PointsMaterial({
-      color: 0x75f0bf,
+      color: 0xc9a84c,
       size: 0.026,
       transparent: true,
       opacity: 0.82,
@@ -65,7 +65,7 @@ export function FrequencyField({ intensity, modeLabel }: FrequencyFieldProps) {
 
     const ringGroup = new THREE.Group();
     const ringMaterial = new THREE.LineBasicMaterial({
-      color: 0xf4c774,
+      color: 0xe5c762,
       transparent: true,
       opacity: 0.48,
     });
@@ -138,7 +138,7 @@ export function FrequencyField({ intensity, modeLabel }: FrequencyFieldProps) {
   }, []);
 
   return (
-    <div className="relative min-h-[420px] overflow-hidden rounded border border-white/10 bg-[#07111f]">
+    <div className="relative min-h-[420px] overflow-hidden rounded border border-white/10 bg-[#050402]">
       <div ref={mountRef} className="absolute inset-0" aria-label="Three.js frequency field" />
       <div className="absolute left-4 top-4 rounded border border-white/10 bg-black/35 px-3 py-2 text-xs uppercase text-slate-200 backdrop-blur">
         {modeLabel} visual engine

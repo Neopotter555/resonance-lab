@@ -32,9 +32,9 @@ export function AnalyzerCanvas({ analyser, isPlaying, variant }: AnalyzerCanvasP
 
     const drawBackground = (width: number, height: number) => {
       context.clearRect(0, 0, width, height);
-      context.fillStyle = "rgba(4, 12, 24, 0.92)";
+      context.fillStyle = "rgba(5, 4, 2, 0.92)";
       context.fillRect(0, 0, width, height);
-      context.strokeStyle = "rgba(180, 196, 210, 0.12)";
+      context.strokeStyle = "rgba(201, 168, 76, 0.12)";
       context.lineWidth = 1;
       for (let x = 0; x < width; x += 36) {
         context.beginPath();
@@ -61,7 +61,7 @@ export function AnalyzerCanvas({ analyser, isPlaying, variant }: AnalyzerCanvasP
       }
 
       context.lineWidth = 2;
-      context.strokeStyle = "#63f4b7";
+      context.strokeStyle = "#e5c762";
       context.beginPath();
 
       const slice = width / timeData.length;
@@ -99,7 +99,7 @@ export function AnalyzerCanvas({ analyser, isPlaying, variant }: AnalyzerCanvasP
         const barHeight = Math.max(2, (sample / 255) * height * 0.92);
         const hueMix = index / bars;
         context.fillStyle =
-          hueMix > 0.64 ? "rgba(244, 199, 116, 0.82)" : "rgba(84, 199, 163, 0.85)";
+          hueMix > 0.64 ? "rgba(229, 199, 98, 0.86)" : "rgba(0, 229, 255, 0.52)";
         context.fillRect(index * barWidth, height - barHeight, Math.max(2, barWidth - 2), barHeight);
       }
     };

@@ -146,6 +146,30 @@ function ControlButton({
   );
 }
 
+function BrandMark({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className={`flex items-center ${compact ? "gap-3" : "gap-4"}`}>
+      <div
+        className={`codex-mark shrink-0 ${compact ? "h-11 w-11" : "h-16 w-16"}`}
+        aria-hidden="true"
+      >
+        <Activity size={compact ? 20 : 28} strokeWidth={1.7} />
+      </div>
+      <div className="min-w-0">
+        <div className="codex-wordmark">
+          <Sparkles size={compact ? 13 : 15} strokeWidth={1.7} />
+          <span>Resonance Codex</span>
+        </div>
+        {!compact && (
+          <p className="mt-1 text-xs text-slate-500">
+            Frequency ritual tools for relaxation and self-observation
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function MetricTile({
   label,
   value,
@@ -158,8 +182,8 @@ function MetricTile({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="rounded border border-white/10 bg-white/7 p-4">
-      <div className="flex items-center justify-between gap-3 text-slate-300">
+    <div className="w-full min-w-0 max-w-full rounded border border-white/10 bg-white/7 p-4">
+      <div className="flex min-w-0 items-center justify-between gap-3 text-slate-300">
         <span className="text-sm">{label}</span>
         <span className="text-emerald-200">{icon}</span>
       </div>
@@ -852,15 +876,7 @@ export function ResonanceLabApp() {
     <main className="resonance-shell min-h-screen w-full max-w-full overflow-x-hidden text-[var(--text-primary)]">
       <div className="flex min-h-screen w-full max-w-full overflow-x-hidden">
         <aside className="hidden w-72 shrink-0 border-r border-white/10 bg-slate-950/70 px-4 py-5 xl:block">
-          <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded bg-emerald-300 text-slate-950">
-              <Activity size={20} />
-            </div>
-            <div>
-              <div className="text-lg font-semibold text-white">{copy.appName}</div>
-              <div className="text-xs uppercase text-slate-500">Consciousness research OS</div>
-            </div>
-          </div>
+          <BrandMark />
 
           <nav className="mt-8 grid gap-1">
             {navItems.map((item) => {
@@ -890,12 +906,17 @@ export function ResonanceLabApp() {
         <section className="flex w-full min-w-0 max-w-full flex-1 flex-col overflow-x-hidden">
           <header className="sticky top-0 z-20 min-w-0 border-b border-white/10 bg-slate-950/85 px-4 py-3 backdrop-blur lg:px-8">
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2 text-xs uppercase text-emerald-200">
-                  <Sparkles size={14} />
-                  {copy.demoMode}
+              <div className="flex min-w-0 items-center gap-4">
+                <div className="hidden sm:block">
+                  <BrandMark compact />
                 </div>
-                <h1 className="mt-1 text-2xl font-semibold text-white">{copy.appName}</h1>
+                <div>
+                  <div className="section-kicker flex items-center gap-2">
+                    <Sparkles size={14} />
+                    {copy.demoMode}
+                  </div>
+                  <h1 className="mt-1 text-2xl font-semibold text-white">{copy.appName}</h1>
+                </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <label className="inline-flex items-center gap-2 rounded border border-white/10 bg-white/8 px-3 py-2 text-sm text-slate-200">
@@ -957,20 +978,28 @@ export function ResonanceLabApp() {
             </nav>
           </header>
 
-          <div className="grid gap-8 px-4 py-6 lg:px-8">
+          <div className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-8 px-4 py-6 lg:px-8">
             <motion.section
               id="dashboard"
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]"
+              className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]"
             >
-              <div className="grid content-start gap-5">
-                <div className="rounded border border-white/10 bg-[var(--panel-bg)] p-5">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                      <p className="text-sm uppercase text-emerald-200">Mission control</p>
-                      <h2 className="mt-2 text-3xl font-semibold text-white">{copy.tagline}</h2>
-                      <p className="mt-3 max-w-3xl text-slate-300">
+              <div className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] content-start gap-5">
+                <div className="w-full min-w-0 max-w-full rounded border border-white/10 bg-[var(--panel-bg)] p-6 sm:p-8">
+                  <div className="flex min-w-0 flex-wrap items-start justify-between gap-6">
+                    <div className="min-w-0 max-w-3xl">
+                      <p className="section-kicker">The relaxation frequency codex</p>
+                      <h2 className="mt-3 text-3xl font-semibold text-white sm:text-5xl">
+                        {copy.appName}
+                      </h2>
+                      <div className="ornament-divider justify-start" aria-hidden="true">
+                        <span>432 Hz</span>
+                      </div>
+                      <p className="mt-3 text-xl italic text-slate-300">
+                        {copy.tagline}
+                      </p>
+                      <p className="mt-4 max-w-3xl text-slate-300">
                         Inspired by frequency ritual aesthetics and Bentov-style oscillator ideas,
                         rebuilt as a careful experimentation tool for sound, breath, visualization,
                         journaling, and transparent evidence labels.
@@ -994,12 +1023,12 @@ export function ResonanceLabApp() {
                       )}
                     </div>
                   </div>
-                  <div className="mt-5 rounded border border-amber-300/20 bg-amber-300/10 p-4 text-sm text-amber-50">
+                  <div className="mt-6 rounded border border-amber-300/20 bg-amber-300/10 p-4 text-sm text-amber-50">
                     {copy.noMedicalClaims}
                   </div>
                 </div>
 
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <div className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-3 md:grid-cols-2 xl:grid-cols-4">
                   <MetricTile
                     label="Active variables"
                     value={`${activeLayerCount}`}

@@ -1,45 +1,56 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f6f8fb;
-  --foreground: #0d1825;
-  --page-bg: linear-gradient(135deg, #07111f 0%, #0f211a 52%, #221b12 100%);
-  --panel-bg: rgba(11, 24, 39, 0.82);
-  --text-primary: #e9f0f7;
+  --background: #050402;
+  --foreground: #f5edd8;
+  --page-bg:
+    radial-gradient(circle at 50% 18%, rgba(201, 168, 76, 0.14), transparent 21rem),
+    radial-gradient(circle at 15% 34%, rgba(0, 229, 255, 0.08), transparent 24rem),
+    radial-gradient(circle at 82% 18%, rgba(112, 82, 25, 0.2), transparent 25rem),
+    linear-gradient(180deg, #050402 0%, #080704 54%, #020201 100%);
+  --panel-bg: rgba(8, 7, 4, 0.76);
+  --panel-soft: rgba(201, 168, 76, 0.07);
+  --panel-strong: rgba(5, 4, 2, 0.92);
+  --panel-border: rgba(201, 168, 76, 0.2);
+  --panel-border-strong: rgba(201, 168, 76, 0.42);
+  --text-primary: #f5edd8;
+  --text-muted: rgba(232, 217, 181, 0.72);
+  --text-dim: rgba(232, 217, 181, 0.5);
+  --gold: #c9a84c;
+  --gold-bright: #e5c762;
+  --gold-dark: #8a6520;
+  --cyan: #00e5ff;
+  --rose: #e06040;
+  --violet: #c8a0e8;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-codex-ui);
+  --font-serif: var(--font-codex-body);
+  --font-display: var(--font-codex-display);
+  --font-mono: var(--font-codex-mono);
 }
 
-html[data-theme="light"] {
-  --page-bg: linear-gradient(135deg, #eff4f7 0%, #eef8f1 52%, #fbf4df 100%);
-  --panel-bg: rgba(255, 255, 255, 0.82);
-  --text-primary: #102032;
-}
-
+html[data-theme="light"],
 html[data-theme="dark"],
 html[data-theme="system"] {
-  --page-bg: linear-gradient(135deg, #07111f 0%, #0f211a 52%, #221b12 100%);
-  --panel-bg: rgba(11, 24, 39, 0.82);
-  --text-primary: #e9f0f7;
-}
-
-@media (prefers-color-scheme: light) {
-  html[data-theme="system"] {
-    --page-bg: linear-gradient(135deg, #eff4f7 0%, #eef8f1 52%, #fbf4df 100%);
-    --panel-bg: rgba(255, 255, 255, 0.82);
-    --text-primary: #102032;
-  }
+  --background: #050402;
+  --foreground: #f5edd8;
+  --page-bg:
+    radial-gradient(circle at 50% 18%, rgba(201, 168, 76, 0.14), transparent 21rem),
+    radial-gradient(circle at 15% 34%, rgba(0, 229, 255, 0.08), transparent 24rem),
+    radial-gradient(circle at 82% 18%, rgba(112, 82, 25, 0.2), transparent 25rem),
+    linear-gradient(180deg, #050402 0%, #080704 54%, #020201 100%);
+  --panel-bg: rgba(8, 7, 4, 0.76);
+  --text-primary: #f5edd8;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-codex-body), Georgia, "Times New Roman", serif;
 }
 
 * {
@@ -50,10 +61,6 @@ html {
   scroll-behavior: smooth;
 }
 
-.resonance-shell {
-  background: var(--page-bg);
-}
-
 button,
 input,
 select,
@@ -61,16 +68,372 @@ textarea {
   font: inherit;
 }
 
+button,
+input,
+select {
+  font-family: var(--font-codex-ui), Arial, Helvetica, sans-serif;
+}
+
+textarea {
+  font-family: var(--font-codex-body), Georgia, "Times New Roman", serif;
+}
+
+::selection {
+  background: rgba(201, 168, 76, 0.35);
+  color: #fff8df;
+}
+
+.resonance-shell {
+  background: var(--page-bg);
+  isolation: isolate;
+  position: relative;
+}
+
+.resonance-shell::before,
+.resonance-shell::after {
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: fixed;
+  z-index: -1;
+}
+
+.resonance-shell::before {
+  background-image:
+    radial-gradient(circle, rgba(201, 168, 76, 0.82) 0 1px, transparent 1.6px),
+    radial-gradient(circle, rgba(201, 168, 76, 0.46) 0 1px, transparent 1.4px),
+    radial-gradient(circle, rgba(0, 229, 255, 0.22) 0 1px, transparent 1.5px);
+  background-position:
+    11px 23px,
+    57px 89px,
+    119px 31px;
+  background-size:
+    139px 151px,
+    211px 233px,
+    307px 263px;
+  opacity: 0.34;
+}
+
+.resonance-shell::after {
+  background:
+    radial-gradient(circle at 50% 9rem, rgba(201, 168, 76, 0.18), transparent 6rem),
+    radial-gradient(circle at 50% 28rem, rgba(201, 168, 76, 0.09), transparent 24rem),
+    linear-gradient(90deg, rgba(5, 4, 2, 0.62), transparent 26%, transparent 74%, rgba(5, 4, 2, 0.62));
+  opacity: 0.84;
+}
+
+.resonance-shell h1,
+.resonance-shell h2 {
+  color: #f5edd8;
+  font-family: var(--font-codex-display), Georgia, serif;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 0.95;
+  text-wrap: balance;
+}
+
+.resonance-shell h3,
+.resonance-shell .font-medium,
+.resonance-shell .font-semibold {
+  letter-spacing: 0;
+}
+
+.resonance-shell p,
+.resonance-shell article {
+  line-height: 1.62;
+}
+
+.resonance-shell .font-mono {
+  font-family: var(--font-codex-mono), "SFMono-Regular", Consolas, monospace;
+}
+
+.resonance-shell .rounded {
+  border-radius: 0.35rem;
+}
+
+.resonance-shell .rounded-full,
+.resonance-shell .rounded-\[999px\] {
+  border-radius: 999px;
+}
+
+.resonance-shell .border-white\/10,
+.resonance-shell .border-white\/12 {
+  border-color: var(--panel-border);
+}
+
+.resonance-shell .border-emerald-300,
+.resonance-shell .border-emerald-300\/20,
+.resonance-shell .border-emerald-300\/30,
+.resonance-shell .border-emerald-300\/40,
+.resonance-shell .border-emerald-300\/50,
+.resonance-shell .border-amber-300\/20,
+.resonance-shell .border-amber-300\/25,
+.resonance-shell .border-slate-300\/20 {
+  border-color: var(--panel-border-strong);
+}
+
+.resonance-shell .border-sky-300\/30 {
+  border-color: rgba(0, 229, 255, 0.36);
+}
+
+.resonance-shell .border-rose-300\/25,
+.resonance-shell .border-rose-300\/30 {
+  border-color: rgba(224, 96, 64, 0.36);
+}
+
+.resonance-shell .bg-\[var\(--panel-bg\)\] {
+  background:
+    linear-gradient(180deg, rgba(13, 10, 5, 0.86), rgba(5, 4, 2, 0.78)),
+    var(--panel-bg);
+  box-shadow:
+    0 0 0 1px rgba(255, 248, 223, 0.03) inset,
+    0 20px 80px rgba(0, 0, 0, 0.34);
+}
+
+.resonance-shell .bg-slate-950,
+.resonance-shell .bg-slate-950\/40,
+.resonance-shell .bg-slate-950\/50,
+.resonance-shell .bg-slate-950\/60,
+.resonance-shell .bg-slate-950\/70,
+.resonance-shell .bg-slate-950\/85 {
+  background-color: rgba(5, 4, 2, 0.9);
+}
+
+.resonance-shell .bg-white\/5,
+.resonance-shell .bg-white\/6,
+.resonance-shell .bg-white\/7,
+.resonance-shell .bg-white\/8,
+.resonance-shell .bg-white\/10,
+.resonance-shell .bg-white\/12,
+.resonance-shell .bg-emerald-300\/8,
+.resonance-shell .bg-emerald-300\/10,
+.resonance-shell .bg-emerald-300\/12,
+.resonance-shell .bg-emerald-300\/15,
+.resonance-shell .bg-slate-300\/8,
+.resonance-shell .bg-amber-300\/10 {
+  background-color: var(--panel-soft);
+}
+
+.resonance-shell .bg-emerald-300,
+.resonance-shell .bg-amber-300 {
+  background-color: var(--gold-bright);
+}
+
+.resonance-shell .bg-rose-400\/10,
+.resonance-shell .bg-rose-400\/15,
+.resonance-shell .bg-rose-400\/20 {
+  background-color: rgba(224, 96, 64, 0.12);
+}
+
+.resonance-shell .bg-slate-800 {
+  background-color: rgba(201, 168, 76, 0.16);
+}
+
+.resonance-shell .text-white {
+  color: #fff8df;
+}
+
+.resonance-shell .text-slate-100,
+.resonance-shell .text-slate-200,
+.resonance-shell .text-slate-300,
+.resonance-shell .text-emerald-50,
+.resonance-shell .text-amber-50 {
+  color: var(--text-primary);
+}
+
+.resonance-shell .text-slate-950 {
+  color: #050402;
+}
+
+.resonance-shell .text-slate-400,
+.resonance-shell .text-emerald-100\/80 {
+  color: var(--text-muted);
+}
+
+.resonance-shell .text-slate-500 {
+  color: var(--text-dim);
+}
+
+.resonance-shell .text-emerald-100,
+.resonance-shell .text-emerald-200,
+.resonance-shell .text-amber-100 {
+  color: var(--gold-bright);
+}
+
+.resonance-shell .text-sky-100 {
+  color: #a8f4ff;
+}
+
+.resonance-shell .text-rose-100 {
+  color: #f0a080;
+}
+
+.resonance-shell .hover\:bg-white\/8:hover,
+.resonance-shell .hover\:bg-white\/10:hover,
+.resonance-shell .hover\:bg-white\/12:hover {
+  background-color: rgba(201, 168, 76, 0.14);
+}
+
+.resonance-shell .hover\:bg-emerald-200:hover {
+  background-color: #f0d080;
+}
+
+.resonance-shell .accent-emerald-300 {
+  accent-color: var(--gold-bright);
+}
+
+.resonance-shell input,
+.resonance-shell select,
+.resonance-shell textarea {
+  background-color: rgba(2, 2, 1, 0.72);
+  border-color: rgba(201, 168, 76, 0.25);
+  color: #fff8df;
+}
+
+.resonance-shell label.grid input,
+.resonance-shell label.grid select,
+.resonance-shell label.grid textarea {
+  max-width: 100%;
+  min-width: 0;
+  width: 100%;
+}
+
+.resonance-shell input:focus,
+.resonance-shell select:focus,
+.resonance-shell textarea:focus,
+.resonance-shell button:focus-visible,
+.resonance-shell a:focus-visible {
+  box-shadow: 0 0 0 2px rgba(201, 168, 76, 0.46);
+  outline: none;
+}
+
+.resonance-shell option,
+.resonance-shell optgroup {
+  background: #050402;
+  color: #f5edd8;
+}
+
+.resonance-shell input[type="range"] {
+  accent-color: var(--gold-bright);
+}
+
+.resonance-shell input[type="range"]::-webkit-slider-runnable-track {
+  background: linear-gradient(90deg, rgba(201, 168, 76, 0.65), rgba(0, 229, 255, 0.2));
+  border-radius: 999px;
+  min-height: 0.45rem;
+}
+
+.resonance-shell input[type="range"]::-webkit-slider-thumb {
+  background: #f5edd8;
+  border: 1px solid rgba(201, 168, 76, 0.75);
+  box-shadow: 0 0 18px rgba(201, 168, 76, 0.36);
+}
+
+.codex-wordmark {
+  align-items: center;
+  color: var(--gold-bright);
+  display: inline-flex;
+  font-family: var(--font-codex-display), Georgia, serif;
+  font-size: 0.86rem;
+  font-weight: 700;
+  gap: 0.55rem;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.codex-mark {
+  align-items: center;
+  aspect-ratio: 1;
+  background:
+    radial-gradient(circle at center, rgba(201, 168, 76, 0.18), transparent 58%),
+    rgba(5, 4, 2, 0.82);
+  border: 1px solid rgba(201, 168, 76, 0.6);
+  border-radius: 999px;
+  color: var(--gold-bright);
+  display: inline-grid;
+  justify-items: center;
+  min-width: 3rem;
+  position: relative;
+}
+
+.codex-mark::before,
+.codex-mark::after {
+  border: 1px solid rgba(201, 168, 76, 0.28);
+  border-radius: 999px;
+  content: "";
+  inset: -0.45rem;
+  position: absolute;
+}
+
+.codex-mark::after {
+  border-color: rgba(0, 229, 255, 0.22);
+  inset: -0.8rem;
+}
+
+.ornament-divider {
+  align-items: center;
+  color: rgba(201, 168, 76, 0.74);
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin: 1.15rem auto;
+  max-width: 18rem;
+}
+
+.ornament-divider::before,
+.ornament-divider::after {
+  background: linear-gradient(90deg, transparent, rgba(201, 168, 76, 0.55));
+  content: "";
+  height: 1px;
+  width: 5rem;
+}
+
+.ornament-divider::after {
+  background: linear-gradient(90deg, rgba(201, 168, 76, 0.55), transparent);
+}
+
+.ornament-divider.justify-start {
+  justify-content: flex-start;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.section-kicker {
+  color: var(--gold-bright);
+  font-family: var(--font-codex-ui), Arial, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+@media (max-width: 767px) {
+  .resonance-shell section,
+  .resonance-shell section > div {
+    max-width: 100%;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .resonance-shell section.grid,
+  .resonance-shell section.grid div.grid:not(.grid-cols-2):not(.grid-cols-3):not(.grid-cols-4):not(.grid-cols-7) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .breath-circle {
   align-items: center;
   animation: breathe 10s ease-in-out infinite;
   aspect-ratio: 1;
   background:
-    radial-gradient(circle at center, rgba(99, 244, 183, 0.18), transparent 58%),
-    rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(99, 244, 183, 0.26);
+    radial-gradient(circle at center, rgba(201, 168, 76, 0.2), transparent 58%),
+    rgba(5, 4, 2, 0.72);
+  border: 1px solid rgba(201, 168, 76, 0.42);
   border-radius: 999px;
-  color: #dffcf0;
+  box-shadow:
+    0 0 0 1.1rem rgba(201, 168, 76, 0.04),
+    0 0 4rem rgba(201, 168, 76, 0.12);
+  color: #f5edd8;
   display: grid;
   gap: 0.25rem;
   justify-items: center;
@@ -79,12 +442,14 @@ textarea {
 }
 
 .breath-circle span:first-child {
+  font-family: var(--font-codex-display), Georgia, serif;
   font-size: 1.35rem;
-  font-weight: 650;
+  font-weight: 700;
 }
 
 .breath-circle span:last-child {
-  color: rgba(226, 232, 240, 0.72);
+  color: var(--text-muted);
+  font-family: var(--font-codex-ui), Arial, sans-serif;
   font-size: 0.85rem;
   text-transform: uppercase;
 }
