@@ -98,6 +98,14 @@ interface ScheduledSession {
   status: "scheduled" | "completed" | "skipped";
 }
 
+interface GuideEvent {
+  id: string;
+  createdAt: string;
+  title: string;
+  detail: string;
+  tone: "gold" | "cyan" | "rose";
+}
+
 function getStoredValue<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
   const raw = window.localStorage.getItem(key);
@@ -300,6 +308,16 @@ export function ResonanceLabApp() {
     breathSync: 58,
   });
   const [assistantPrompt, setAssistantPrompt] = useState(ASSISTANT_STARTER.prompt);
+  const [guideEvents, setGuideEvents] = useState<GuideEvent[]>([
+    {
+      id: "welcome-loop",
+      createdAt: "",
+      title: "Loop ready",
+      detail:
+        "Choose one intention, one audio variable, and one journal note. The app will keep each step visible.",
+      tone: "gold",
+    },
+  ]);
   const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([
     {
       id: "starter",
@@ -470,6 +488,16 @@ export function ResonanceLabApp() {
   );
   const todayKey = new Date().toISOString().slice(0, 10);
   const habitCheckedToday = habitCheckins.includes(todayKey);
+  const recordGuideEvent = (event: Omit<GuideEvent, "id" | "createdAt">) => {
+    setGuideEvents((current) => [
+      {
+        id: createId(),
+        createdAt: new Date().toISOString(),
+        ...event,
+      },
+      ...current,
+    ].slice(0, 8));
+  };
   const assistantGuideCards = [
     {
       title: "1. Intention",
@@ -514,11 +542,21 @@ export function ResonanceLabApp() {
     await start(layers, mode, binaural, isochronic, soundscape, relaxMusic);
     setRemainingSeconds(activeProtocol.durationMinutes * 60);
     setTimerActive(true);
+    recordGuideEvent({
+      title: "Audio session started",
+      detail: `${activeProtocol.title} is running in ${modeLabels[mode]} mode. Keep volume gentle and watch green/yellow/red body signals.`,
+      tone: "gold",
+    });
   };
 
   const stopAudio = () => {
     setTimerActive(false);
     stop();
+    recordGuideEvent({
+      title: "Audio stopped",
+      detail: "Write the journal entry before changing frequency, mode, or intention. Clean notes make the next loop useful.",
+      tone: "cyan",
+    });
   };
 
   const updateLayer = (id: string, patch: Partial<FrequencyLayer>) => {
@@ -545,6 +583,11 @@ export function ResonanceLabApp() {
 
   const applyFrequencyChoice = (choice: FrequencyChoice) => {
     setSelectedFrequencyChoiceId(choice.id);
+    recordGuideEvent({
+      title: "Frequency preset applied",
+      detail: `${choice.label} is now part of the experiment. Evidence lane: ${choice.evidence}. Treat it as a variable, not a promise.`,
+      tone: choice.evidence === "Hypothesis" ? "cyan" : "gold",
+    });
 
     if (choice.target === "beat") {
       setBinaural((current) => ({ ...current, beat: choice.frequency }));
@@ -628,6 +671,11 @@ export function ResonanceLabApp() {
     anchor.download = "resonance-lab-session.json";
     anchor.click();
     URL.revokeObjectURL(url);
+    recordGuideEvent({
+      title: "Session exported",
+      detail: "Downloaded a JSON snapshot of the current protocol, audio settings, and journal history.",
+      tone: "cyan",
+    });
   };
 
   const saveProtocol = () => {
@@ -639,6 +687,11 @@ export function ResonanceLabApp() {
     setProtocols((current) =>
       current.map((protocol) => (protocol.id === activeProtocol.id ? updated : protocol)),
     );
+    recordGuideEvent({
+      title: "Protocol saved",
+      detail: `${activeProtocol.title} now stores the current audio mode. Re-run the same setup once before changing another variable.`,
+      tone: "gold",
+    });
   };
 
   const saveFrequencyPreset = () => {
@@ -654,6 +707,11 @@ export function ResonanceLabApp() {
       relaxMusic,
     };
     setFrequencyPresets((current) => [preset, ...current].slice(0, 16));
+    recordGuideEvent({
+      title: "Frequency preset saved",
+      detail: `${preset.title} is saved locally. Load it later to repeat the same conditions.`,
+      tone: "gold",
+    });
   };
 
   const loadFrequencyPreset = (preset: FrequencyPreset) => {
@@ -664,10 +722,31 @@ export function ResonanceLabApp() {
     setSoundscape(preset.soundscape ?? DEFAULT_SOUNDSCAPE);
     setRelaxMusic(preset.relaxMusic ?? DEFAULT_RELAX_MUSIC);
     setPresetTitle(preset.title);
+    recordGuideEvent({
+      title: "Frequency preset loaded",
+      detail: `${preset.title} restored mode, tones, soundscape, and relax music settings.`,
+      tone: "cyan",
+    });
+  };
+
+  const deleteFrequencyPreset = (id: string, title: string) => {
+    setFrequencyPresets((current) => current.filter((item) => item.id !== id));
+    recordGuideEvent({
+      title: "Frequency preset deleted",
+      detail: `${title} was removed from local presets. Current audio settings stayed unchanged.`,
+      tone: "rose",
+    });
   };
 
   const scheduleActiveProtocol = () => {
-    if (!scheduleFor) return;
+    if (!scheduleFor) {
+      recordGuideEvent({
+        title: "Schedule needs a time",
+        detail: "Pick a date and time first, then schedule the active protocol.",
+        tone: "rose",
+      });
+      return;
+    }
     const next: ScheduledSession = {
       id: createId(),
       protocolTitle: activeProtocol.title,
@@ -675,14 +754,27 @@ export function ResonanceLabApp() {
       status: "scheduled",
     };
     setScheduledSessions((current) => [next, ...current].slice(0, 8));
+    recordGuideEvent({
+      title: "Session scheduled",
+      detail: `${activeProtocol.title} is scheduled for ${new Date(scheduleFor).toLocaleString()}. Keep the setup unchanged if you want comparable notes.`,
+      tone: "gold",
+    });
   };
 
   const toggleHabitToday = () => {
+    const willCheckIn = !habitCheckedToday;
     setHabitCheckins((current) =>
       current.includes(todayKey)
         ? current.filter((item) => item !== todayKey)
         : [todayKey, ...current].slice(0, 90),
     );
+    recordGuideEvent({
+      title: willCheckIn ? "Habit checked in" : "Habit check-in removed",
+      detail: willCheckIn
+        ? "Today is marked complete. Consistency is tracked as a rhythm, not a score."
+        : "Today is no longer marked complete. The history remains honest.",
+      tone: willCheckIn ? "gold" : "cyan",
+    });
   };
 
   const requestJournalAnalysis = () => {
@@ -715,6 +807,11 @@ export function ResonanceLabApp() {
     };
     setProtocols((current) => [...current, next]);
     setActiveProtocolId(next.id);
+    recordGuideEvent({
+      title: "Custom protocol created",
+      detail: "A new experiment shell is ready. Edit intention, duration, breath pace, and visualization before saving.",
+      tone: "gold",
+    });
   };
 
   const updateActiveProtocol = (patch: Partial<SessionProtocol>) => {
@@ -734,6 +831,11 @@ export function ResonanceLabApp() {
     };
     setJournalEntries((current) => [entry, ...current].slice(0, 80));
     setJournalDraft((current) => ({ ...current, notes: "" }));
+    recordGuideEvent({
+      title: "Journal entry saved",
+      detail: `${entry.protocolTitle}: mood ${entry.moodBefore} to ${entry.moodAfter}, focus ${entry.focus}/10, stress ${entry.stressPerception}/10.`,
+      tone: "gold",
+    });
   };
 
   const submitAssistantPrompt = async (promptOverride?: string) => {
@@ -748,6 +850,11 @@ export function ResonanceLabApp() {
 
     setAssistantMessages((current) => [...current, userMessage]);
     setAssistantBusy(true);
+    recordGuideEvent({
+      title: "Assistant loop started",
+      detail: "Checking prompt, protocol, audio settings, journal data, safety boundaries, and evidence labels.",
+      tone: "cyan",
+    });
 
     try {
       const response = await fetch("/api/assistant", {
@@ -791,6 +898,11 @@ export function ResonanceLabApp() {
           signals: payload.signals,
         },
       ]);
+      recordGuideEvent({
+        title: "Assistant loop completed",
+        detail: "Read the next actions, safety checks, session signals, and evidence lanes before running the next experiment.",
+        tone: "gold",
+      });
     } catch {
       setAssistantMessages((current) => [
         ...current,
@@ -802,6 +914,11 @@ export function ResonanceLabApp() {
           provider: "local-error-fallback",
         },
       ]);
+      recordGuideEvent({
+        title: "Assistant fallback used",
+        detail: "The route did not return a full response, so the local safety fallback kept the loop cautious.",
+        tone: "rose",
+      });
     } finally {
       setAssistantBusy(false);
     }
@@ -1129,6 +1246,44 @@ export function ResonanceLabApp() {
                     icon={<Bot size={18} />}
                   />
                 </div>
+
+                <div className="rounded border border-white/10 bg-[var(--panel-bg)] p-4" aria-live="polite">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="section-kicker">Live guidance log</p>
+                      <h3 className="mt-1 font-medium text-white">What just happened and what to do next</h3>
+                    </div>
+                    <span className="rounded border border-amber-300/25 bg-amber-300/10 px-3 py-1 text-xs uppercase text-amber-100">
+                      Loop memory
+                    </span>
+                  </div>
+                  <div className="mt-4 grid gap-2">
+                    {guideEvents.slice(0, 5).map((event) => {
+                      const toneClass =
+                        event.tone === "rose"
+                          ? "border-rose-300/30 bg-rose-400/10 text-rose-100"
+                          : event.tone === "cyan"
+                            ? "border-sky-300/30 bg-sky-300/10 text-sky-100"
+                            : "border-amber-300/25 bg-amber-300/10 text-amber-100";
+                      return (
+                        <div key={event.id} className={`rounded border p-3 ${toneClass}`}>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="text-sm font-medium text-white">{event.title}</span>
+                            <span className="text-xs opacity-70">
+                              {event.createdAt
+                                ? new Date(event.createdAt).toLocaleTimeString([], {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })
+                                : "ready"}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-sm">{event.detail}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               <FrequencyField intensity={visualIntensity} modeLabel={modeLabels[mode]} />
@@ -1412,11 +1567,7 @@ export function ResonanceLabApp() {
                           <button
                             type="button"
                             title="Delete preset"
-                            onClick={() =>
-                              setFrequencyPresets((current) =>
-                                current.filter((item) => item.id !== preset.id),
-                              )
-                            }
+                            onClick={() => deleteFrequencyPreset(preset.id, preset.title)}
                             className="grid h-7 w-7 shrink-0 place-items-center rounded text-rose-100 hover:bg-rose-400/15"
                           >
                             <Trash2 size={14} />
