@@ -133,6 +133,8 @@ async function run() {
         : [],
       decisionState: payload.decision?.state,
       decisionTitle: payload.decision?.title,
+      loopPrescriptionTitle: payload.loopPrescription?.title,
+      loopPrescriptionAction: payload.loopPrescription?.nextAction,
       journalCueLabels: Array.isArray(payload.journalCues)
         ? payload.journalCues.map((item) => item.label)
         : [],
@@ -146,6 +148,7 @@ async function run() {
         analyzePayload.guidance.some((item) => item.phase === "Analyze newest entry") &&
         analyzePayload.guidance.some((item) => item.phase === "Decision rule") &&
         analyzePayload.decision?.title === "Continue carefully" &&
+        analyzePayload.loopPrescription?.title === "Repeat to confirm" &&
         Array.isArray(analyzePayload.journalCues) &&
         analyzePayload.journalCues.some((item) => item.label === "Newest change"),
     };
@@ -169,6 +172,9 @@ async function run() {
       apiTrace.guidancePhases.includes("Next loop") &&
       apiTrace.decisionState === "continue" &&
       apiTrace.decisionTitle === "Run first baseline" &&
+      apiTrace.loopPrescriptionTitle === "Baseline loop" &&
+      typeof apiTrace.loopPrescriptionAction === "string" &&
+      apiTrace.loopPrescriptionAction.includes("Analyze") &&
       apiTrace.journalCueLabels.includes("Before play") &&
       apiTrace.journalCueLabels.includes("Decision gate") &&
       apiTrace.analyze &&
@@ -188,6 +194,7 @@ async function run() {
     starterContract: await visible(page, "Loop contract"),
     starterGuidance: await visible(page, "Guidance notes"),
     starterDecision: await visible(page, "Run first baseline"),
+    starterLoopPrescription: await visible(page, "Baseline loop"),
     starterJournalCues:
       (await visible(page, "Journal cues")) && (await visible(page, "Before play")),
     starterAskMode: await visible(page, "Ask mode"),
@@ -209,6 +216,9 @@ async function run() {
     askTrace: false,
     askGuidance: false,
     askDecision: false,
+    askLoopPrescription: false,
+    loopPrescriptionLoaded: false,
+    loopPrescriptionNotes: false,
     askJournalCues: false,
     journalCuesLoaded: false,
     journalCueNotes: false,
@@ -217,6 +227,7 @@ async function run() {
     analyzeTrace: false,
     analyzeGuidance: false,
     analyzeDecision: false,
+    analyzeLoopPrescription: false,
     analyzeJournalCues: false,
     scheduleGuidance: false,
     habitSignal: "",
@@ -281,6 +292,14 @@ async function run() {
   checks.askContract = (await visible(page, "Inputs watched")) && (await visible(page, "Deliverable"));
   checks.askGuidance = (await visible(page, "During session")) && (await visible(page, "After session"));
   checks.askDecision = await visible(page, "Continue carefully");
+  checks.askLoopPrescription = await visible(page, "Repeat to confirm");
+  await page.getByTitle("Use loop prescription").last().click();
+  checks.loopPrescriptionLoaded = await waitForText(page, "Loop prescription loaded");
+  const planNotes = await page
+    .getByPlaceholder("What changed, what stayed the same, and what else was happening today?")
+    .inputValue();
+  checks.loopPrescriptionNotes =
+    planNotes.includes("Loop prescription:") && planNotes.includes("Keep fixed:");
   checks.askJournalCues = await visible(page, "Journal cues");
   await page.getByTitle("Use journal cues").last().click();
   checks.journalCuesLoaded = await waitForText(page, "Journal cues loaded");
@@ -302,6 +321,7 @@ async function run() {
     (await visible(page, "Analyze newest entry")) &&
     (await visible(page, "Decision rule"));
   checks.analyzeDecision = await visible(page, "Continue carefully");
+  checks.analyzeLoopPrescription = await visible(page, "Repeat to confirm");
   checks.analyzeJournalCues = await visible(page, "Newest change");
 
   await page.locator('input[type="datetime-local"]').fill(tomorrowLocalInputValue());

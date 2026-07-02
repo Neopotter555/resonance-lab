@@ -145,6 +145,18 @@ export interface AssistantJournalCue {
   reason: string;
 }
 
+export interface AssistantLoopPrescription {
+  state: AssistantDecisionState;
+  title: string;
+  intention: string;
+  fixedVariable: string;
+  changedVariable: string;
+  audioBoundary: string;
+  signalToWatch: string;
+  journalFocus: string;
+  nextAction: string;
+}
+
 export interface AssistantMessage {
   id: string;
   role: "user" | "assistant";
@@ -156,6 +168,7 @@ export interface AssistantMessage {
   guidance?: AssistantGuidanceNote[];
   decision?: AssistantDecisionGate;
   journalCues?: AssistantJournalCue[];
+  loopPrescription?: AssistantLoopPrescription;
   actions?: string[];
   checks?: string[];
   signals?: string[];

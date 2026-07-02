@@ -3,6 +3,7 @@ import type {
   AssistantDecisionGate,
   AssistantGuidanceNote,
   AssistantJournalCue,
+  AssistantLoopPrescription,
   AssistantMode,
   AssistantTraceStep,
   BinauralConfig,
@@ -398,6 +399,86 @@ const buildJournalCues = (
   ];
 };
 
+const buildLoopPrescription = (
+  context: AssistantContext,
+  summary: JournalSummary,
+  decision: AssistantDecisionGate,
+): AssistantLoopPrescription => {
+  const activeProtocol = context.activeProtocol;
+  const title = typeof activeProtocol?.title === "string" ? activeProtocol.title : "current protocol";
+  const duration =
+    typeof activeProtocol?.durationMinutes === "number" && Number.isFinite(activeProtocol.durationMinutes)
+      ? activeProtocol.durationMinutes
+      : 15;
+  const intention =
+    typeof activeProtocol?.intention === "string" && activeProtocol.intention.trim()
+      ? sentenceEnd(activeProtocol.intention)
+      : "observe one body or attention signal without forcing a result";
+  const toneDescription = getToneDescription(context);
+  const baseBoundary = `${duration} minutes or less, low comfortable volume, no multitasking, and stop on red signals.`;
+
+  if (decision.state === "stop") {
+    return {
+      state: decision.state,
+      title: "Reset loop",
+      intention: "Settle the body before collecting more data.",
+      fixedVariable: `Do not optimize ${toneDescription}; keep the experiment paused until the journal signal is settled.`,
+      changedVariable:
+        "Change the boundary first: stop now, then restart only with a shorter timer and lower level.",
+      audioBoundary:
+        "No new audio run until discomfort, pressure, dizziness, panic, or harsh-volume sensation is gone.",
+      signalToWatch: "Red signal: any pressure to push through, body discomfort, anxiety spike, or headache.",
+      journalFocus: "Write the exact red signal, when it appeared, and what stopped it.",
+      nextAction: "Rest, reset, and only run Analyze again after a calmer entry exists.",
+    };
+  }
+
+  if (decision.state === "soften") {
+    return {
+      state: decision.state,
+      title: "Gentle repeat loop",
+      intention,
+      fixedVariable: `Keep the same intention and ${toneDescription} so the next entry is comparable.`,
+      changedVariable:
+        "Soften one intensity variable only: lower level, shorten timer, or remove one background layer.",
+      audioBoundary: baseBoundary,
+      signalToWatch: "Yellow signal: restlessness, tension, tiredness, unease, or stress that does not settle.",
+      journalFocus: "Record whether the softer boundary made the same signal easier, unchanged, or worse.",
+      nextAction: "Repeat once, save notes immediately, then Analyze before changing frequency or mode.",
+    };
+  }
+
+  if (summary.count > 0) {
+    return {
+      state: decision.state,
+      title: "Repeat to confirm",
+      intention,
+      fixedVariable: `Keep ${title}, ${toneDescription}, timer, breath pace, and volume unchanged for one more run.`,
+      changedVariable:
+        "Change only the observation target: watch one signal from the latest journal more carefully.",
+      audioBoundary: baseBoundary,
+      signalToWatch: "Green signal: breath settles, shoulders soften, and attention returns without effort.",
+      journalFocus:
+        "Write what repeated from the last entry, what changed, and whether the signal stayed green.",
+      nextAction: "If the repeat stays green, choose one variable to test next; if yellow or red appears, soften or stop.",
+    };
+  }
+
+  return {
+    state: decision.state,
+    title: "Baseline loop",
+    intention,
+    fixedVariable: `Start with ${title} and ${toneDescription}; do not compare against other presets yet.`,
+    changedVariable:
+      "Change nothing during the first run. The first useful variable is the journal baseline itself.",
+    audioBoundary: baseBoundary,
+    signalToWatch: "First green, yellow, or red body signal that appears while the audio is running.",
+    journalFocus:
+      "Save before/after mood, focus, energy, sleep quality, stress, context, and one body signal.",
+    nextAction: "After saving the first entry, run Analyze so the next loop uses evidence instead of guessing.",
+  };
+};
+
 const buildActions = (context: AssistantContext, summary: JournalSummary) => {
   const activeProtocol = context.activeProtocol;
   const duration =
@@ -510,6 +591,7 @@ export async function POST(request: Request) {
   const summary = summarizeJournal(journalEntries);
   const assistantMode = inferAssistantMode(prompt);
   const decision = buildDecision(journalEntries, summary);
+  const loopPrescription = buildLoopPrescription(context, summary, decision);
 
   if (!prompt) {
     return Response.json(
@@ -532,6 +614,7 @@ export async function POST(request: Request) {
     guidance: buildGuidance(context, summary, assistantMode),
     decision,
     journalCues: buildJournalCues(assistantMode, decision),
+    loopPrescription,
     actions: buildActions(context, summary),
     checks: buildChecks(),
     signals: buildSignals(),

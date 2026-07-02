@@ -50,6 +50,7 @@ import type {
   AssistantDecisionGate,
   AssistantGuidanceNote,
   AssistantJournalCue,
+  AssistantLoopPrescription,
   AssistantMessage,
   AssistantTraceStep,
   BinauralConfig,
@@ -142,6 +143,35 @@ const fallbackDecision: AssistantDecisionGate = {
     "The assistant route did not complete, so the safest loop is conservative and low intensity.",
   nextStep:
     "Keep the current intention, lower one intensity variable, journal the result, and retry Analyze after saving.",
+};
+
+const starterLoopPrescription: AssistantLoopPrescription = {
+  state: "continue",
+  title: "Baseline loop",
+  intention: "Observe one body or attention signal without forcing a result.",
+  fixedVariable:
+    "Start with the current protocol, current audio mode, and comfortable low volume.",
+  changedVariable:
+    "Change nothing during the first run. The first useful variable is the journal baseline itself.",
+  audioBoundary:
+    "Run short, stay at low volume, avoid multitasking, and stop on discomfort, dizziness, panic, or harsh volume.",
+  signalToWatch: "First green, yellow, or red body signal that appears while the audio is running.",
+  journalFocus:
+    "Save before/after mood, focus, energy, sleep quality, stress, context, and one body signal.",
+  nextAction: "After saving the first entry, run Analyze so the next loop uses evidence instead of guessing.",
+};
+
+const fallbackLoopPrescription: AssistantLoopPrescription = {
+  state: "soften",
+  title: "Fallback gentle loop",
+  intention: "Keep the session calm while the assistant route is unavailable.",
+  fixedVariable: "Keep the same intention and current protocol so the journal remains comparable.",
+  changedVariable: "Lower one intensity variable only: level, timer, or background layer.",
+  audioBoundary:
+    "Run only if the audio feels comfortable, and stop immediately on discomfort or anxiety spike.",
+  signalToWatch: "Yellow or red signal that appears when intensity is too high.",
+  journalFocus: "Write what felt easier or harder after softening the setup.",
+  nextAction: "Save the entry, then retry Analyze before changing frequency or mode.",
 };
 
 const createId = () =>
@@ -486,6 +516,7 @@ export function ResonanceLabApp() {
       ],
       decision: starterDecision,
       journalCues: starterJournalCues,
+      loopPrescription: starterLoopPrescription,
       nextPrompt:
         "After I finish my first low-volume session and save a journal entry, analyze the newest entry. Show what changed, what stayed the same, green/yellow/red signals, one safety note, and the single next variable to keep or change. Keep research support, hypothesis, historical teaching, and user experience separate.",
     },
@@ -1209,6 +1240,7 @@ export function ResonanceLabApp() {
         guidance?: AssistantGuidanceNote[];
         decision?: AssistantDecisionGate;
         journalCues?: AssistantJournalCue[];
+        loopPrescription?: AssistantLoopPrescription;
         trace?: AssistantTraceStep[];
         nextPrompt?: string;
       };
@@ -1233,6 +1265,7 @@ export function ResonanceLabApp() {
           guidance: payload.guidance,
           decision: payload.decision,
           journalCues: payload.journalCues,
+          loopPrescription: payload.loopPrescription,
           trace: payload.trace,
           nextPrompt: payload.nextPrompt,
         },
@@ -1326,6 +1359,7 @@ export function ResonanceLabApp() {
           ],
           decision: fallbackDecision,
           journalCues: starterJournalCues,
+          loopPrescription: fallbackLoopPrescription,
           nextPrompt:
             "After I run one short low-volume session and save a journal entry, analyze the newest entry cautiously. Identify green/yellow/red signals, one safety boundary, and one next variable to keep or change.",
         },
@@ -1351,6 +1385,31 @@ export function ResonanceLabApp() {
       detail:
         "The assistant prompt now contains the next analysis loop. Run it after the session and journal entry are complete.",
       tone: "cyan",
+    });
+  };
+
+  const applyLoopPrescription = (prescription: AssistantLoopPrescription) => {
+    const prescriptionText = [
+      `Loop prescription: ${prescription.title}`,
+      `Intention: ${prescription.intention}`,
+      `Keep fixed: ${prescription.fixedVariable}`,
+      `Change now: ${prescription.changedVariable}`,
+      `Boundary: ${prescription.audioBoundary}`,
+      `Watch: ${prescription.signalToWatch}`,
+      `Journal focus: ${prescription.journalFocus}`,
+      `Next action: ${prescription.nextAction}`,
+    ].join("\n");
+    setJournalDraft((current) => ({
+      ...current,
+      notes: current.notes.trim()
+        ? `${current.notes.trim()}\n\n${prescriptionText}`
+        : prescriptionText,
+    }));
+    recordGuideEvent({
+      title: "Loop prescription loaded",
+      detail:
+        "The assistant's loop prescription was added to the journal notes so the next run has one clear plan.",
+      tone: prescription.state === "stop" ? "rose" : prescription.state === "soften" ? "gold" : "cyan",
     });
   };
 
@@ -2665,6 +2724,53 @@ export function ResonanceLabApp() {
                           <p className="mt-3 rounded border border-white/10 bg-slate-950/45 p-3 text-sm text-slate-100">
                             {message.decision.nextStep}
                           </p>
+                        </div>
+                      )}
+
+                      {message.role === "assistant" && message.loopPrescription && (
+                        <div className="mt-4 rounded border border-sky-300/25 bg-sky-300/10 p-3 text-sky-100">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <div className="flex items-center gap-2 text-xs font-semibold uppercase">
+                                <Radar size={14} />
+                                Loop prescription
+                              </div>
+                              <h3 className="mt-2 text-base font-semibold text-white">
+                                {message.loopPrescription.title}
+                              </h3>
+                              <p className="mt-1 text-sm text-sky-100/85">
+                                {message.loopPrescription.intention}
+                              </p>
+                            </div>
+                            <ControlButton
+                              title="Use loop prescription"
+                              onClick={() =>
+                                message.loopPrescription
+                                  ? applyLoopPrescription(message.loopPrescription)
+                                  : undefined
+                              }
+                            >
+                              <Plus size={16} />
+                              Use plan
+                            </ControlButton>
+                          </div>
+                          <div className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+                            {[
+                              ["Keep fixed", message.loopPrescription.fixedVariable],
+                              ["Change now", message.loopPrescription.changedVariable],
+                              ["Audio boundary", message.loopPrescription.audioBoundary],
+                              ["Signal to watch", message.loopPrescription.signalToWatch],
+                              ["Journal focus", message.loopPrescription.journalFocus],
+                              ["Next action", message.loopPrescription.nextAction],
+                            ].map(([label, value]) => (
+                              <div key={label} className="rounded border border-white/10 bg-slate-950/45 p-3">
+                                <div className="text-xs font-semibold uppercase text-sky-100/80">
+                                  {label}
+                                </div>
+                                <p className="mt-1 text-slate-200">{value}</p>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
 
