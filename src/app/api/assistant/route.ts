@@ -1,4 +1,5 @@
 import type {
+  AssistantTraceStep,
   BinauralConfig,
   EvidenceLevel,
   FrequencyMode,
@@ -157,6 +158,52 @@ const buildSignals = () => [
   "Red signal: pain, panic, dizziness, harsh volume, or compulsive chasing of an effect; stop and reset.",
 ];
 
+const buildTrace = (
+  prompt: string,
+  context: AssistantContext,
+  summary: JournalSummary,
+): AssistantTraceStep[] => {
+  const activeProtocol = context.activeProtocol;
+  const title = typeof activeProtocol?.title === "string" ? activeProtocol.title : "current protocol";
+  const duration =
+    typeof activeProtocol?.durationMinutes === "number" && Number.isFinite(activeProtocol.durationMinutes)
+      ? activeProtocol.durationMinutes
+      : null;
+
+  return [
+    {
+      title: "Prompt parsed",
+      detail:
+        prompt.length > 24
+          ? `I found a usable request: "${prompt.slice(0, 96)}${prompt.length > 96 ? "..." : ""}"`
+          : "The prompt is short, so I will keep the answer conservative and ask the journal loop to do the learning.",
+      state: prompt.length > 24 ? "ready" : "watch",
+    },
+    {
+      title: "Protocol matched",
+      detail: `${title}${duration ? `, ${duration} minutes` : ""}, using ${getToneDescription(context)}.`,
+      state: "ready",
+    },
+    {
+      title: "Journal evidence checked",
+      detail: summary.count
+        ? `${summary.count} entr${summary.count === 1 ? "y" : "ies"} found. I can compare only your own trend, not claim causation.`
+        : "No baseline entries yet. The next session should create the first clean before/after note.",
+      state: summary.count ? "ready" : "watch",
+    },
+    {
+      title: "Safety boundary applied",
+      detail: "Low volume, short duration, no medical claims, no multitasking, and stop on red body signals.",
+      state: "ready",
+    },
+    {
+      title: "Deliverable assembled",
+      detail: "Output includes one next loop, evidence lanes, green/yellow/red signals, and journal instructions.",
+      state: "ready",
+    },
+  ];
+};
+
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as {
     prompt?: string;
@@ -187,5 +234,6 @@ export async function POST(request: Request) {
     actions: buildActions(context, summary),
     checks: buildChecks(),
     signals: buildSignals(),
+    trace: buildTrace(prompt, context, summary),
   });
 }

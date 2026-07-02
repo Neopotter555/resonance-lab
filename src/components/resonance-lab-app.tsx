@@ -47,6 +47,7 @@ import {
 } from "@/lib/resonance-content";
 import type {
   AssistantMessage,
+  AssistantTraceStep,
   BinauralConfig,
   EvidenceLevel,
   FrequencyChoice,
@@ -78,6 +79,12 @@ const evidenceTone: Record<EvidenceLevel, string> = {
   Hypothesis: "border-sky-300/30 bg-sky-300/10 text-sky-100",
   "Historical spiritual teaching": "border-amber-300/30 bg-amber-300/10 text-amber-100",
   "User experience": "border-slate-300/30 bg-slate-300/10 text-slate-100",
+};
+
+const traceTone: Record<AssistantTraceStep["state"], string> = {
+  ready: "border-emerald-300/30 bg-emerald-300/10 text-emerald-100",
+  watch: "border-amber-300/30 bg-amber-300/10 text-amber-100",
+  stop: "border-rose-300/30 bg-rose-400/10 text-rose-100",
 };
 
 const modeLabels: Record<FrequencyMode, string> = {
@@ -349,6 +356,26 @@ export function ResonanceLabApp() {
         "Yellow: restlessness or boredom worth noting.",
         "Red: discomfort, dizziness, panic, or harsh volume means stop.",
       ],
+      trace: [
+        {
+          title: "Operating role",
+          detail:
+            "I behave like a lab guide: define one loop, separate evidence lanes, and keep claims cautious.",
+          state: "ready",
+        },
+        {
+          title: "Inputs watched",
+          detail:
+            "Prompt, active protocol, audio mode, selected frequency, journal entries, and safety boundaries.",
+          state: "ready",
+        },
+        {
+          title: "Missing baseline",
+          detail:
+            "If there are no journal entries, the first answer will focus on collecting clean before/after data.",
+          state: "watch",
+        },
+      ],
     },
   ]);
   const [journalDraft, setJournalDraft] = useState({
@@ -537,16 +564,111 @@ export function ResonanceLabApp() {
         "Use my current protocol and journal data to choose the next safest experiment loop, with one variable and a clear success note.",
     },
   ];
+  const promptReady = assistantPrompt.trim().length >= 24;
+  const currentAudioVariable =
+    selectedFrequencyChoice
+      ? `${selectedFrequencyChoice.label} (${selectedFrequencyChoice.evidence})`
+      : mode === "binaural"
+        ? `${binaural.beat} Hz beat on ${binaural.carrier} Hz carrier`
+        : mode === "isochronic"
+          ? `${isochronic.pulse} Hz pulse on ${isochronic.carrier} Hz carrier`
+          : `${activeLayerCount} enabled pure-tone layer${activeLayerCount === 1 ? "" : "s"}`;
+  const assistantReadiness: AssistantTraceStep[] = [
+    {
+      title: "Prompt clarity",
+      detail: promptReady
+        ? "Usable request detected. The assistant can turn it into one bounded loop."
+        : "Add one desired state, session goal, or question before asking.",
+      state: promptReady ? "ready" : "watch",
+    },
+    {
+      title: "Protocol context",
+      detail: `${activeProtocol.title}, ${activeProtocol.durationMinutes} minutes, intention: ${activeProtocol.intention}`,
+      state: activeProtocol.intention.trim() ? "ready" : "watch",
+    },
+    {
+      title: "Audio variable",
+      detail: `${modeLabels[mode]} is active: ${currentAudioVariable}. Change only one variable per loop.`,
+      state: "ready",
+    },
+    {
+      title: "Journal baseline",
+      detail: journalEntries.length
+        ? `${journalEntries.length} local entr${journalEntries.length === 1 ? "y" : "ies"} available for personal trend comparison.`
+        : "No entries yet. Analyze will build a first-baseline checklist instead of claiming a pattern.",
+      state: journalEntries.length ? "ready" : "watch",
+    },
+    {
+      title: "Safety boundary",
+      detail: "Low volume, no multitasking, stop on discomfort, and keep every frequency claim labeled.",
+      state: "ready",
+    },
+  ];
 
-  const beginAudio = async () => {
-    await start(layers, mode, binaural, isochronic, soundscape, relaxMusic);
-    setRemainingSeconds(activeProtocol.durationMinutes * 60);
-    setTimerActive(true);
+  const selectMode = (nextMode: FrequencyMode) => {
+    if (nextMode === mode) return;
+    setMode(nextMode);
     recordGuideEvent({
-      title: "Audio session started",
-      detail: `${activeProtocol.title} is running in ${modeLabels[mode]} mode. Keep volume gentle and watch green/yellow/red body signals.`,
+      title: "Audio mode selected",
+      detail: `${modeLabels[nextMode]} is now active. Keep the rest of the setup unchanged if you want a clean comparison.`,
+      tone: "cyan",
+    });
+  };
+
+  const selectProtocol = (protocol: SessionProtocol) => {
+    setActiveProtocolId(protocol.id);
+    setMode(protocol.mode);
+    recordGuideEvent({
+      title: "Protocol selected",
+      detail: `${protocol.title} loaded with ${modeLabels[protocol.mode]} mode and a ${protocol.durationMinutes}-minute boundary.`,
       tone: "gold",
     });
+  };
+
+  const toggleRelaxMusic = () => {
+    const enabled = !relaxMusic.enabled;
+    setRelaxMusic((current) => ({ ...current, enabled }));
+    recordGuideEvent({
+      title: enabled ? "Relax music enabled" : "Relax music paused",
+      detail: enabled
+        ? "The generated background pad will start with the next play press. Keep it soft under the main tone."
+        : "The next session will run without the music bed, which makes the audio variable cleaner.",
+      tone: enabled ? "gold" : "cyan",
+    });
+  };
+
+  const toggleSoundscape = () => {
+    const enabled = !soundscape.enabled;
+    setSoundscape((current) => ({ ...current, enabled }));
+    recordGuideEvent({
+      title: enabled ? "Ambient soundscape enabled" : "Ambient soundscape paused",
+      detail: enabled
+        ? `${soundscape.type} texture will layer in quietly on play. Note it in the journal if you compare sessions.`
+        : "The next run removes ambient texture, which can make the frequency experiment easier to compare.",
+      tone: enabled ? "gold" : "cyan",
+    });
+  };
+
+  const beginAudio = async () => {
+    try {
+      await start(layers, mode, binaural, isochronic, soundscape, relaxMusic);
+      setRemainingSeconds(activeProtocol.durationMinutes * 60);
+      setTimerActive(true);
+      recordGuideEvent({
+        title: "Audio session started",
+        detail: `${activeProtocol.title} is running in ${modeLabels[mode]} mode. Keep volume gentle and watch green/yellow/red body signals.`,
+        tone: "gold",
+      });
+    } catch {
+      setTimerActive(false);
+      setRemainingSeconds(0);
+      recordGuideEvent({
+        title: "Audio could not start",
+        detail:
+          "The browser blocked or failed the audio context. Press play again from the page, check volume permissions, or reload before journaling.",
+        tone: "rose",
+      });
+    }
   };
 
   const stopAudio = () => {
@@ -579,6 +701,11 @@ export function ResonanceLabApp() {
         note: "Custom experiment variable. Record what you changed before comparing sessions.",
       },
     ]);
+    recordGuideEvent({
+      title: "Tone layer added",
+      detail: "A 528 Hz custom layer is active. Rename it or change only this layer before comparing sessions.",
+      tone: "cyan",
+    });
   };
 
   const applyFrequencyChoice = (choice: FrequencyChoice) => {
@@ -648,7 +775,13 @@ export function ResonanceLabApp() {
   };
 
   const removeLayer = (id: string) => {
+    const layer = layers.find((item) => item.id === id);
     setLayers((current) => current.filter((layer) => layer.id !== id));
+    recordGuideEvent({
+      title: "Tone layer removed",
+      detail: `${layer?.label ?? "A tone layer"} was removed. Re-run once before changing another variable.`,
+      tone: "rose",
+    });
   };
 
   const exportSession = () => {
@@ -879,6 +1012,7 @@ export function ResonanceLabApp() {
         actions?: string[];
         checks?: string[];
         signals?: string[];
+        trace?: AssistantTraceStep[];
       };
 
       if (!response.ok) {
@@ -896,6 +1030,7 @@ export function ResonanceLabApp() {
           actions: payload.actions,
           checks: payload.checks,
           signals: payload.signals,
+          trace: payload.trace,
         },
       ]);
       recordGuideEvent({
@@ -912,6 +1047,31 @@ export function ResonanceLabApp() {
           content:
             "The assistant service is offline, so this local fallback is keeping the safety protocol active: change one variable, use low volume, and record subjective observations.",
           provider: "local-error-fallback",
+          trace: [
+            {
+              title: "Route failed",
+              detail: "The API request did not complete, so the UI switched to the local safety fallback.",
+              state: "stop",
+            },
+            {
+              title: "Fallback boundary",
+              detail: "Continue only with low volume, one changed variable, and a journal entry after the session.",
+              state: "watch",
+            },
+          ],
+          actions: [
+            "Run a short session only if the audio feels comfortable.",
+            "Record what happened before changing any other setting.",
+          ],
+          checks: [
+            "Do not treat this fallback as personalized advice.",
+            "Stop on discomfort, dizziness, anxiety spike, or harsh volume.",
+          ],
+          signals: [
+            "Green: calm attention returns easily.",
+            "Yellow: restlessness or uncertainty means soften the experiment.",
+            "Red: discomfort means stop and reset.",
+          ],
         },
       ]);
       recordGuideEvent({
@@ -1302,7 +1462,7 @@ export function ResonanceLabApp() {
                     <button
                       key={option}
                       type="button"
-                      onClick={() => setMode(option)}
+                      onClick={() => selectMode(option)}
                       className={`rounded border px-3 py-2 text-sm transition ${
                         mode === option
                           ? "border-emerald-300 bg-emerald-300 text-slate-950"
@@ -1424,9 +1584,7 @@ export function ResonanceLabApp() {
                     <button
                       type="button"
                       title="Toggle relax music"
-                      onClick={() =>
-                        setRelaxMusic((current) => ({ ...current, enabled: !current.enabled }))
-                      }
+                      onClick={toggleRelaxMusic}
                       className={`rounded px-3 py-2 text-sm ${
                         relaxMusic.enabled
                           ? "bg-emerald-300 text-slate-950"
@@ -1483,9 +1641,7 @@ export function ResonanceLabApp() {
                     <button
                       type="button"
                       title="Toggle soundscape"
-                      onClick={() =>
-                        setSoundscape((current) => ({ ...current, enabled: !current.enabled }))
-                      }
+                      onClick={toggleSoundscape}
                       className={`rounded px-3 py-2 text-sm ${
                         soundscape.enabled
                           ? "bg-emerald-300 text-slate-950"
@@ -1641,10 +1797,7 @@ export function ResonanceLabApp() {
                     <button
                       key={protocol.id}
                       type="button"
-                      onClick={() => {
-                        setActiveProtocolId(protocol.id);
-                        setMode(protocol.mode);
-                      }}
+                      onClick={() => selectProtocol(protocol)}
                       className={`flex items-center justify-between rounded border px-4 py-3 text-left transition ${
                         activeProtocol.id === protocol.id
                           ? "border-emerald-300/50 bg-emerald-300/12 text-white"
@@ -1991,6 +2144,34 @@ export function ResonanceLabApp() {
 
               <div className="grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
                 <div className="grid content-start gap-4">
+                  <div className="rounded border border-white/10 bg-white/6 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2 text-sm font-medium text-white">
+                          <Bot size={16} />
+                          Assistant preflight
+                        </div>
+                        <p className="mt-1 text-sm text-slate-400">
+                          What the system is checking before it answers.
+                        </p>
+                      </div>
+                      <span className="rounded border border-amber-300/25 bg-amber-300/10 px-3 py-1 text-xs uppercase text-amber-100">
+                        Live state
+                      </span>
+                    </div>
+                    <div className="mt-3 grid gap-2">
+                      {assistantReadiness.map((step) => (
+                        <div key={step.title} className={`rounded border p-3 ${traceTone[step.state]}`}>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="text-sm font-medium text-white">{step.title}</span>
+                            <span className="text-xs uppercase opacity-75">{step.state}</span>
+                          </div>
+                          <p className="mt-1 text-sm">{step.detail}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   <label className="grid gap-2 text-sm text-slate-300">
                     <span className="flex items-center justify-between gap-3">
                       <span>Prompt</span>
@@ -2086,6 +2267,26 @@ export function ResonanceLabApp() {
                         )}
                       </div>
                       <p className="mt-3 text-sm text-slate-300">{message.content}</p>
+
+                      {message.role === "assistant" && message.trace && (
+                        <div className="mt-4 rounded border border-white/10 bg-white/6 p-3">
+                          <div className="flex items-center gap-2 text-xs font-semibold uppercase text-emerald-200">
+                            <Bot size={14} />
+                            Operator trace
+                          </div>
+                          <div className="mt-3 grid gap-2">
+                            {message.trace.map((step) => (
+                              <div key={step.title} className={`rounded border p-3 ${traceTone[step.state]}`}>
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <span className="text-sm font-medium text-white">{step.title}</span>
+                                  <span className="text-xs uppercase opacity-75">{step.state}</span>
+                                </div>
+                                <p className="mt-1 text-sm">{step.detail}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
                       {message.role === "assistant" && (
                         <div className="mt-4 grid gap-3">
@@ -2248,7 +2449,7 @@ export function ResonanceLabApp() {
                       <button
                         key={protocol.id}
                         type="button"
-                        onClick={() => setActiveProtocolId(protocol.id)}
+                        onClick={() => selectProtocol(protocol)}
                         className="rounded border border-white/10 bg-slate-950/50 px-3 py-2 text-left text-sm text-slate-200 hover:bg-white/8"
                       >
                         <span className="block font-medium text-white">{protocol.title}</span>

@@ -109,6 +109,12 @@ export interface JournalEntry {
   notes: string;
 }
 
+export interface AssistantTraceStep {
+  title: string;
+  detail: string;
+  state: "ready" | "watch" | "stop";
+}
+
 export interface AssistantMessage {
   id: string;
   role: "user" | "assistant";
@@ -118,6 +124,7 @@ export interface AssistantMessage {
   actions?: string[];
   checks?: string[];
   signals?: string[];
+  trace?: AssistantTraceStep[];
 }
 
 export interface ResearchItem {
