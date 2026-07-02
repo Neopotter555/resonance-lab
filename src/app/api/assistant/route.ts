@@ -1,4 +1,5 @@
 import type {
+  AssistantConfidenceReview,
   AssistantContractItem,
   AssistantDecisionGate,
   AssistantGuidanceNote,
@@ -479,6 +480,82 @@ const buildLoopPrescription = (
   };
 };
 
+const buildConfidenceReview = (
+  summary: JournalSummary,
+  decision: AssistantDecisionGate,
+  assistantMode: AssistantMode,
+): AssistantConfidenceReview => {
+  if (decision.state === "stop") {
+    return {
+      state: decision.state,
+      title: "Low confidence: reset first",
+      score: 25,
+      basis:
+        "The newest journal signal suggests discomfort or too much intensity, so optimization is not reliable.",
+      limitation:
+        "A red signal overrides pattern-seeking. The system should not interpret discomfort as progress.",
+      userProof:
+        "A safer next entry shows the body settled after stopping, lowering intensity, or shortening the timer.",
+      falsifier:
+        "Any repeated discomfort, pressure, panic, dizziness, headache, or urge to push through.",
+      safetyRule:
+        "Stop now, reset the boundary, and do not ask the system to intensify the session.",
+    };
+  }
+
+  if (decision.state === "soften") {
+    return {
+      state: decision.state,
+      title: "Caution confidence: soften first",
+      score: 50,
+      basis:
+        "The journal or stress pattern is usable, but it points to mild friction rather than a clean green signal.",
+      limitation:
+        "The data can guide gentler design only. It cannot prove the frequency caused the state change.",
+      userProof:
+        "A softer repeat produces equal or better mood/focus with lower stress and no red signal.",
+      falsifier:
+        "The same yellow signal repeats, stress rises, or the user starts chasing a stronger effect.",
+      safetyRule:
+        "Change one intensity boundary only, then journal before changing frequency or mode.",
+    };
+  }
+
+  if (summary.count > 0) {
+    return {
+      state: decision.state,
+      title: "Personal-signal confidence",
+      score: assistantMode === "analyze" ? 72 : 66,
+      basis:
+        `The system can use ${summary.count} saved entr${summary.count === 1 ? "y" : "ies"} plus the newest prompt, protocol, and audio settings.`,
+      limitation:
+        "This is personal trend evidence, not medical evidence and not proof that the frequency caused the result.",
+      userProof:
+        "Repeat the same setup once and see whether the same green signal returns without increasing intensity.",
+      falsifier:
+        "Mood drops, stress rises, or a yellow/red signal appears when the same setup is repeated.",
+      safetyRule:
+        "Trust repetition over novelty. Keep one variable fixed until the journal shows a stable pattern.",
+    };
+  }
+
+  return {
+    state: decision.state,
+    title: "Baseline confidence",
+    score: 40,
+    basis:
+      "The system has protocol, audio mode, prompt, and safety rules, but no saved journal evidence yet.",
+    limitation:
+      "The first answer can only design a careful baseline. It should not analyze a pattern that does not exist.",
+    userProof:
+      "The first saved journal entry includes before/after state, context, and one green/yellow/red signal.",
+    falsifier:
+      "The session produces discomfort, unclear notes, or multiple changed variables that make comparison impossible.",
+    safetyRule:
+      "Run low and short, write the first entry immediately, then use Analyze before optimizing.",
+  };
+};
+
 const buildActions = (context: AssistantContext, summary: JournalSummary) => {
   const activeProtocol = context.activeProtocol;
   const duration =
@@ -592,6 +669,7 @@ export async function POST(request: Request) {
   const assistantMode = inferAssistantMode(prompt);
   const decision = buildDecision(journalEntries, summary);
   const loopPrescription = buildLoopPrescription(context, summary, decision);
+  const confidenceReview = buildConfidenceReview(summary, decision, assistantMode);
 
   if (!prompt) {
     return Response.json(
@@ -615,6 +693,7 @@ export async function POST(request: Request) {
     decision,
     journalCues: buildJournalCues(assistantMode, decision),
     loopPrescription,
+    confidenceReview,
     actions: buildActions(context, summary),
     checks: buildChecks(),
     signals: buildSignals(),

@@ -157,6 +157,17 @@ export interface AssistantLoopPrescription {
   nextAction: string;
 }
 
+export interface AssistantConfidenceReview {
+  state: AssistantDecisionState;
+  title: string;
+  score: number;
+  basis: string;
+  limitation: string;
+  userProof: string;
+  falsifier: string;
+  safetyRule: string;
+}
+
 export interface AssistantMessage {
   id: string;
   role: "user" | "assistant";
@@ -169,6 +180,7 @@ export interface AssistantMessage {
   decision?: AssistantDecisionGate;
   journalCues?: AssistantJournalCue[];
   loopPrescription?: AssistantLoopPrescription;
+  confidenceReview?: AssistantConfidenceReview;
   actions?: string[];
   checks?: string[];
   signals?: string[];

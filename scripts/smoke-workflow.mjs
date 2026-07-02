@@ -135,6 +135,8 @@ async function run() {
       decisionTitle: payload.decision?.title,
       loopPrescriptionTitle: payload.loopPrescription?.title,
       loopPrescriptionAction: payload.loopPrescription?.nextAction,
+      confidenceTitle: payload.confidenceReview?.title,
+      confidenceScore: payload.confidenceReview?.score,
       journalCueLabels: Array.isArray(payload.journalCues)
         ? payload.journalCues.map((item) => item.label)
         : [],
@@ -149,6 +151,7 @@ async function run() {
         analyzePayload.guidance.some((item) => item.phase === "Decision rule") &&
         analyzePayload.decision?.title === "Continue carefully" &&
         analyzePayload.loopPrescription?.title === "Repeat to confirm" &&
+        analyzePayload.confidenceReview?.title === "Personal-signal confidence" &&
         Array.isArray(analyzePayload.journalCues) &&
         analyzePayload.journalCues.some((item) => item.label === "Newest change"),
     };
@@ -175,6 +178,8 @@ async function run() {
       apiTrace.loopPrescriptionTitle === "Baseline loop" &&
       typeof apiTrace.loopPrescriptionAction === "string" &&
       apiTrace.loopPrescriptionAction.includes("Analyze") &&
+      apiTrace.confidenceTitle === "Baseline confidence" &&
+      apiTrace.confidenceScore === 40 &&
       apiTrace.journalCueLabels.includes("Before play") &&
       apiTrace.journalCueLabels.includes("Decision gate") &&
       apiTrace.analyze &&
@@ -195,6 +200,7 @@ async function run() {
     starterGuidance: await visible(page, "Guidance notes"),
     starterDecision: await visible(page, "Run first baseline"),
     starterLoopPrescription: await visible(page, "Baseline loop"),
+    starterConfidenceReview: await visible(page, "Baseline confidence"),
     starterJournalCues:
       (await visible(page, "Journal cues")) && (await visible(page, "Before play")),
     starterAskMode: await visible(page, "Ask mode"),
@@ -217,6 +223,9 @@ async function run() {
     askGuidance: false,
     askDecision: false,
     askLoopPrescription: false,
+    askConfidenceReview: false,
+    confidenceReviewLoaded: false,
+    confidenceReviewNotes: false,
     loopPrescriptionLoaded: false,
     loopPrescriptionNotes: false,
     askJournalCues: false,
@@ -228,6 +237,7 @@ async function run() {
     analyzeGuidance: false,
     analyzeDecision: false,
     analyzeLoopPrescription: false,
+    analyzeConfidenceReview: false,
     analyzeJournalCues: false,
     scheduleGuidance: false,
     habitSignal: "",
@@ -293,6 +303,7 @@ async function run() {
   checks.askGuidance = (await visible(page, "During session")) && (await visible(page, "After session"));
   checks.askDecision = await visible(page, "Continue carefully");
   checks.askLoopPrescription = await visible(page, "Repeat to confirm");
+  checks.askConfidenceReview = await visible(page, "Personal-signal confidence");
   await page.getByTitle("Use loop prescription").last().click();
   checks.loopPrescriptionLoaded = await waitForText(page, "Loop prescription loaded");
   const planNotes = await page
@@ -300,6 +311,13 @@ async function run() {
     .inputValue();
   checks.loopPrescriptionNotes =
     planNotes.includes("Loop prescription:") && planNotes.includes("Keep fixed:");
+  await page.getByTitle("Use confidence review").last().click();
+  checks.confidenceReviewLoaded = await waitForText(page, "Confidence review loaded");
+  const confidenceNotes = await page
+    .getByPlaceholder("What changed, what stayed the same, and what else was happening today?")
+    .inputValue();
+  checks.confidenceReviewNotes =
+    confidenceNotes.includes("Confidence review:") && confidenceNotes.includes("Falsifier:");
   checks.askJournalCues = await visible(page, "Journal cues");
   await page.getByTitle("Use journal cues").last().click();
   checks.journalCuesLoaded = await waitForText(page, "Journal cues loaded");
@@ -322,6 +340,7 @@ async function run() {
     (await visible(page, "Decision rule"));
   checks.analyzeDecision = await visible(page, "Continue carefully");
   checks.analyzeLoopPrescription = await visible(page, "Repeat to confirm");
+  checks.analyzeConfidenceReview = await visible(page, "Personal-signal confidence");
   checks.analyzeJournalCues = await visible(page, "Newest change");
 
   await page.locator('input[type="datetime-local"]').fill(tomorrowLocalInputValue());

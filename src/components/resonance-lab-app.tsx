@@ -46,6 +46,7 @@ import {
   RESEARCH_LIBRARY,
 } from "@/lib/resonance-content";
 import type {
+  AssistantConfidenceReview,
   AssistantContractItem,
   AssistantDecisionGate,
   AssistantGuidanceNote,
@@ -172,6 +173,36 @@ const fallbackLoopPrescription: AssistantLoopPrescription = {
   signalToWatch: "Yellow or red signal that appears when intensity is too high.",
   journalFocus: "Write what felt easier or harder after softening the setup.",
   nextAction: "Save the entry, then retry Analyze before changing frequency or mode.",
+};
+
+const starterConfidenceReview: AssistantConfidenceReview = {
+  state: "continue",
+  title: "Baseline confidence",
+  score: 40,
+  basis:
+    "The system has protocol, audio mode, prompt, and safety rules, but no saved journal evidence yet.",
+  limitation:
+    "The first answer can only design a careful baseline. It should not analyze a pattern that does not exist.",
+  userProof:
+    "The first saved journal entry includes before/after state, context, and one green/yellow/red signal.",
+  falsifier:
+    "The session produces discomfort, unclear notes, or multiple changed variables that make comparison impossible.",
+  safetyRule:
+    "Run low and short, write the first entry immediately, then use Analyze before optimizing.",
+};
+
+const fallbackConfidenceReview: AssistantConfidenceReview = {
+  state: "soften",
+  title: "Fallback confidence",
+  score: 35,
+  basis:
+    "The remote assistant response was unavailable, so only local safety rules and visible UI state are being used.",
+  limitation:
+    "This fallback cannot compare nuanced patterns or infer a better frequency choice.",
+  userProof:
+    "A later Analyze response can read the newest saved journal entry and restore the full loop.",
+  falsifier: "Any discomfort, anxiety spike, dizziness, or sense that the sound is too strong.",
+  safetyRule: "Soften intensity and save notes before retrying the assistant route.",
 };
 
 const createId = () =>
@@ -517,6 +548,7 @@ export function ResonanceLabApp() {
       decision: starterDecision,
       journalCues: starterJournalCues,
       loopPrescription: starterLoopPrescription,
+      confidenceReview: starterConfidenceReview,
       nextPrompt:
         "After I finish my first low-volume session and save a journal entry, analyze the newest entry. Show what changed, what stayed the same, green/yellow/red signals, one safety note, and the single next variable to keep or change. Keep research support, hypothesis, historical teaching, and user experience separate.",
     },
@@ -1241,6 +1273,7 @@ export function ResonanceLabApp() {
         decision?: AssistantDecisionGate;
         journalCues?: AssistantJournalCue[];
         loopPrescription?: AssistantLoopPrescription;
+        confidenceReview?: AssistantConfidenceReview;
         trace?: AssistantTraceStep[];
         nextPrompt?: string;
       };
@@ -1266,6 +1299,7 @@ export function ResonanceLabApp() {
           decision: payload.decision,
           journalCues: payload.journalCues,
           loopPrescription: payload.loopPrescription,
+          confidenceReview: payload.confidenceReview,
           trace: payload.trace,
           nextPrompt: payload.nextPrompt,
         },
@@ -1360,6 +1394,7 @@ export function ResonanceLabApp() {
           decision: fallbackDecision,
           journalCues: starterJournalCues,
           loopPrescription: fallbackLoopPrescription,
+          confidenceReview: fallbackConfidenceReview,
           nextPrompt:
             "After I run one short low-volume session and save a journal entry, analyze the newest entry cautiously. Identify green/yellow/red signals, one safety boundary, and one next variable to keep or change.",
         },
@@ -1385,6 +1420,27 @@ export function ResonanceLabApp() {
       detail:
         "The assistant prompt now contains the next analysis loop. Run it after the session and journal entry are complete.",
       tone: "cyan",
+    });
+  };
+
+  const applyConfidenceReview = (review: AssistantConfidenceReview) => {
+    const reviewText = [
+      `Confidence review: ${review.title} (${review.score}/100)`,
+      `Basis: ${review.basis}`,
+      `Limit: ${review.limitation}`,
+      `Proof to look for: ${review.userProof}`,
+      `Falsifier: ${review.falsifier}`,
+      `Safety rule: ${review.safetyRule}`,
+    ].join("\n");
+    setJournalDraft((current) => ({
+      ...current,
+      notes: current.notes.trim() ? `${current.notes.trim()}\n\n${reviewText}` : reviewText,
+    }));
+    recordGuideEvent({
+      title: "Confidence review loaded",
+      detail:
+        "The assistant's confidence review was added to the journal notes so the next entry can prove or disprove the loop.",
+      tone: review.state === "stop" ? "rose" : review.state === "soften" ? "gold" : "cyan",
     });
   };
 
@@ -2770,6 +2826,52 @@ export function ResonanceLabApp() {
                                 <p className="mt-1 text-slate-200">{value}</p>
                               </div>
                             ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {message.role === "assistant" && message.confidenceReview && (
+                        <div className={`mt-4 rounded border p-3 ${decisionTone[message.confidenceReview.state]}`}>
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <div className="flex items-center gap-2 text-xs font-semibold uppercase">
+                                <Brain size={14} />
+                                Confidence review
+                              </div>
+                              <h3 className="mt-2 text-base font-semibold text-white">
+                                {message.confidenceReview.title}
+                              </h3>
+                            </div>
+                            <div className="rounded border border-current/25 px-3 py-1 text-sm font-semibold">
+                              {message.confidenceReview.score}/100
+                            </div>
+                          </div>
+                          <div className="mt-3 grid gap-2 text-sm">
+                            {[
+                              ["Basis", message.confidenceReview.basis],
+                              ["Limit", message.confidenceReview.limitation],
+                              ["Proof to look for", message.confidenceReview.userProof],
+                              ["Falsifier", message.confidenceReview.falsifier],
+                              ["Safety rule", message.confidenceReview.safetyRule],
+                            ].map(([label, value]) => (
+                              <div key={label} className="rounded border border-white/10 bg-slate-950/45 p-3">
+                                <div className="text-xs font-semibold uppercase opacity-80">{label}</div>
+                                <p className="mt-1 text-slate-100">{value}</p>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="mt-3">
+                            <ControlButton
+                              title="Use confidence review"
+                              onClick={() =>
+                                message.confidenceReview
+                                  ? applyConfidenceReview(message.confidenceReview)
+                                  : undefined
+                              }
+                            >
+                              <Plus size={16} />
+                              Use review
+                            </ControlButton>
                           </div>
                         </div>
                       )}
