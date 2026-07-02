@@ -115,12 +115,19 @@ export interface AssistantTraceStep {
   state: "ready" | "watch" | "stop";
 }
 
+export interface AssistantContractItem {
+  label: string;
+  value: string;
+  state: "ready" | "watch" | "stop";
+}
+
 export interface AssistantMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
   provider?: string;
   sections?: Record<EvidenceLevel, string>;
+  contract?: AssistantContractItem[];
   actions?: string[];
   checks?: string[];
   signals?: string[];

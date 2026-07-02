@@ -102,6 +102,9 @@ async function run() {
       actions: payload.actions?.length ?? 0,
       checks: payload.checks?.length ?? 0,
       signals: payload.signals?.length ?? 0,
+      contractLabels: Array.isArray(payload.contract)
+        ? payload.contract.map((item) => item.label)
+        : [],
       nextPrompt:
         typeof payload.nextPrompt === "string" &&
         payload.nextPrompt.includes("analyze the newest journal entry"),
@@ -119,6 +122,8 @@ async function run() {
       apiTrace.actions >= 4 &&
       apiTrace.checks >= 4 &&
       apiTrace.signals >= 3 &&
+      apiTrace.contractLabels.includes("Objective") &&
+      apiTrace.contractLabels.includes("Loop rule") &&
       apiTrace.nextPrompt,
     preflightVisible: await visible(page, "Assistant preflight"),
     promptPreflight: await visible(page, "Prompt clarity"),
@@ -132,6 +137,9 @@ async function run() {
     compassNextPromptFocus: false,
     compassReadyFocus: false,
     starterTrace: await visible(page, "Operator trace"),
+    starterContract: await visible(page, "Loop contract"),
+    contractObjective: await visible(page, "Objective"),
+    contractLoopRule: await visible(page, "Loop rule"),
     modeGuidance: false,
     toneLayerAdded: false,
     toneLayerRemoved: false,
@@ -209,6 +217,7 @@ async function run() {
   await page.getByTitle("Ask assistant").click();
   await waitForText(page, "Assistant loop completed", 15000);
   checks.askTrace = (await visible(page, "Prompt parsed")) && (await visible(page, "Deliverable assembled"));
+  checks.askContract = (await visible(page, "Inputs watched")) && (await visible(page, "Deliverable"));
   checks.nextPromptCard = await visible(page, "Next loop prompt");
   checks.compassNextPromptFocus = await visible(page, "Load the next loop prompt");
   await page.getByTitle("Load next loop prompt").last().click();

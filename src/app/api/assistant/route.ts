@@ -1,4 +1,5 @@
 import type {
+  AssistantContractItem,
   AssistantTraceStep,
   BinauralConfig,
   EvidenceLevel,
@@ -117,11 +118,58 @@ const buildAnswer = (prompt: string, context: AssistantContext, summary: Journal
     : "Because there is no journal baseline yet, the first mission is to collect clean before-and-after notes.";
 
   return [
-    `I am building a bounded ${duration}-minute ${mode} experiment for ${title}. The goal is relaxation, attention, and self-observation, not diagnosis, treatment, or certainty.`,
+    `What I am doing: I am turning your request into a bounded ${duration}-minute ${mode} experiment for ${title}.`,
+    "What I am trying to deliver: a safe repeatable loop, not a mystical verdict or medical answer.",
     journalLine,
-    `For your request, I will keep four lanes separate: research support, hypothesis, historical teaching, and user experience. The next best loop is simple: set one intention, change one variable, run the timer, journal honestly, then repeat before drawing conclusions.`,
+    "How I will think: I will keep research support, hypothesis, historical teaching, and user experience in separate lanes.",
+    "How you use it: set one intention, change one variable, run the timer, journal honestly, then repeat before drawing conclusions.",
     `Prompt received: "${prompt.slice(0, 220)}"`,
   ].join(" ");
+};
+
+const buildContract = (
+  prompt: string,
+  context: AssistantContext,
+  summary: JournalSummary,
+): AssistantContractItem[] => {
+  const activeProtocol = context.activeProtocol;
+  const title = typeof activeProtocol?.title === "string" ? activeProtocol.title : "current protocol";
+  const duration =
+    typeof activeProtocol?.durationMinutes === "number" && Number.isFinite(activeProtocol.durationMinutes)
+      ? activeProtocol.durationMinutes
+      : 15;
+  const mode = context.mode ? modeLabel[context.mode] : "audio";
+  const promptState = prompt.length >= 24 ? "ready" : "watch";
+
+  return [
+    {
+      label: "Objective",
+      value: `Build a ${duration}-minute ${mode} loop for ${title}; keep the goal to relaxation, attention, and self-observation.`,
+      state: "ready",
+    },
+    {
+      label: "Inputs watched",
+      value: `Prompt ${promptState === "ready" ? "is clear enough" : "is short"}; protocol, audio mode, tone settings, journal count, and safety boundary are checked.`,
+      state: promptState,
+    },
+    {
+      label: "Safety boundary",
+      value: "Low volume, no multitasking, no medical claims, and stop on discomfort, dizziness, panic, or harsh volume.",
+      state: "ready",
+    },
+    {
+      label: "Deliverable",
+      value: "One next loop, one variable, green/yellow/red signals, journal fields, evidence labels, and a follow-up prompt.",
+      state: "ready",
+    },
+    {
+      label: "Loop rule",
+      value: summary.count
+        ? "Use the newest journal entry as personal evidence only, then repeat before changing another variable."
+        : "Create the first baseline journal entry before asking the system to compare patterns.",
+      state: summary.count ? "ready" : "watch",
+    },
+  ];
 };
 
 const buildActions = (context: AssistantContext, summary: JournalSummary) => {
@@ -251,6 +299,7 @@ export async function POST(request: Request) {
         : "local-safety-fallback",
     answer: buildAnswer(prompt, context, summary),
     sections: buildSections(prompt, context, summary),
+    contract: buildContract(prompt, context, summary),
     actions: buildActions(context, summary),
     checks: buildChecks(),
     signals: buildSignals(),

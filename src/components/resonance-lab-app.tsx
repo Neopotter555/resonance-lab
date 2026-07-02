@@ -46,6 +46,7 @@ import {
   RESEARCH_LIBRARY,
 } from "@/lib/resonance-content";
 import type {
+  AssistantContractItem,
   AssistantMessage,
   AssistantTraceStep,
   BinauralConfig,
@@ -378,6 +379,34 @@ export function ResonanceLabApp() {
           state: "watch",
         },
       ],
+      contract: [
+        {
+          label: "Objective",
+          value:
+            "Turn the current protocol into a repeatable relaxation and self-observation loop.",
+          state: "ready",
+        },
+        {
+          label: "Inputs watched",
+          value: "Prompt, protocol, audio mode, selected frequency, journal entries, and safety boundary.",
+          state: "ready",
+        },
+        {
+          label: "Safety boundary",
+          value: "Low volume, no multitasking, no medical claims, and stop on red body signals.",
+          state: "ready",
+        },
+        {
+          label: "Deliverable",
+          value: "One next loop, one changed variable, signals, journal fields, evidence lanes, and a next prompt.",
+          state: "ready",
+        },
+        {
+          label: "Loop rule",
+          value: "Collect at least one journal entry before treating any pattern as personally meaningful.",
+          state: "watch",
+        },
+      ],
       nextPrompt:
         "After I finish my first low-volume session and save a journal entry, analyze the newest entry. Show what changed, what stayed the same, green/yellow/red signals, one safety note, and the single next variable to keep or change. Keep research support, hypothesis, historical teaching, and user experience separate.",
     },
@@ -550,22 +579,27 @@ export function ResonanceLabApp() {
   const promptTemplates = [
     {
       label: "Calm focus",
-      prompt: `Build a ${activeProtocol.durationMinutes}-minute calm-focus experiment using ${modeLabels[mode]}. Tell me the intention, one variable, green/yellow/red signals, and journal fields.`,
+      prompt: `Build a ${activeProtocol.durationMinutes}-minute calm-focus experiment using ${modeLabels[mode]}. Start with the loop contract: objective, inputs watched, safety boundary, deliverable, and next-loop rule. Then tell me the intention, one variable, green/yellow/red signals, and journal fields.`,
     },
     {
       label: "Sleep wind-down",
       prompt:
-        "Create a gentle sleep wind-down session with low-volume audio, breath pacing, clear stop signals, and no medical claims.",
+        "Create a gentle sleep wind-down session. Start with the loop contract, then give low-volume audio guidance, breath pacing, clear stop signals, and no medical claims.",
     },
     {
       label: "Evidence check",
       prompt:
-        "Review my current frequency idea. Separate research support, hypothesis, historical teaching, and user experience. Tell me what not to claim.",
+        "Review my current frequency idea. Start with the loop contract. Separate research support, hypothesis, historical teaching, and user experience. Tell me what not to claim.",
     },
     {
       label: "Next loop",
       prompt:
-        "Use my current protocol and journal data to choose the next safest experiment loop, with one variable and a clear success note.",
+        "Use my current protocol and journal data to choose the next safest experiment loop. Start with the loop contract, then give one variable and a clear success note.",
+    },
+    {
+      label: "Signal translator",
+      prompt:
+        "Translate my session signals into a cautious next step. Start with the loop contract, then separate green, yellow, and red signals, safety checks, evidence lanes, and one next variable.",
     },
   ];
   const promptReady = assistantPrompt.trim().length >= 24;
@@ -1000,7 +1034,7 @@ export function ResonanceLabApp() {
                 `${entry.protocolTitle}: mood ${entry.moodBefore}->${entry.moodAfter}, focus ${entry.focus}, energy ${entry.energy}, sleep ${entry.sleepQuality}, stress ${entry.stressPerception}, notes "${entry.notes || "none"}"`,
             )
             .join("; ");
-    const analysisPrompt = `Analyze my recent journal entries cautiously. Show the loop, signals, safety checks, and one next experiment. Data: ${summary}`;
+    const analysisPrompt = `Analyze my recent journal entries cautiously. Start with the loop contract: objective, inputs watched, safety boundary, deliverable, and next-loop rule. Then show the loop, signals, safety checks, evidence lanes, and one next experiment. Data: ${summary}`;
     setAssistantPrompt(analysisPrompt);
     void submitAssistantPrompt(analysisPrompt);
   };
@@ -1091,6 +1125,7 @@ export function ResonanceLabApp() {
         actions?: string[];
         checks?: string[];
         signals?: string[];
+        contract?: AssistantContractItem[];
         trace?: AssistantTraceStep[];
         nextPrompt?: string;
       };
@@ -1110,6 +1145,7 @@ export function ResonanceLabApp() {
           actions: payload.actions,
           checks: payload.checks,
           signals: payload.signals,
+          contract: payload.contract,
           trace: payload.trace,
           nextPrompt: payload.nextPrompt,
         },
@@ -1152,6 +1188,33 @@ export function ResonanceLabApp() {
             "Green: calm attention returns easily.",
             "Yellow: restlessness or uncertainty means soften the experiment.",
             "Red: discomfort means stop and reset.",
+          ],
+          contract: [
+            {
+              label: "Objective",
+              value: "Keep the session bounded while the remote assistant route is unavailable.",
+              state: "watch",
+            },
+            {
+              label: "Inputs watched",
+              value: "Local UI state only: active protocol, audio settings, prompt, and journal context.",
+              state: "watch",
+            },
+            {
+              label: "Safety boundary",
+              value: "Low volume, no medical claims, and stop on discomfort or anxiety spike.",
+              state: "ready",
+            },
+            {
+              label: "Deliverable",
+              value: "A conservative one-variable loop plus journal instruction.",
+              state: "ready",
+            },
+            {
+              label: "Loop rule",
+              value: "Save a journal entry before asking for analysis.",
+              state: "watch",
+            },
           ],
           nextPrompt:
             "After I run one short low-volume session and save a journal entry, analyze the newest entry cautiously. Identify green/yellow/red signals, one safety boundary, and one next variable to keep or change.",
@@ -2408,6 +2471,26 @@ export function ResonanceLabApp() {
                         )}
                       </div>
                       <p className="mt-3 text-sm text-slate-300">{message.content}</p>
+
+                      {message.role === "assistant" && message.contract && (
+                        <div className="mt-4 rounded border border-white/10 bg-white/6 p-3">
+                          <div className="flex items-center gap-2 text-xs font-semibold uppercase text-emerald-200">
+                            <FlaskConical size={14} />
+                            Loop contract
+                          </div>
+                          <div className="mt-3 grid gap-2">
+                            {message.contract.map((item) => (
+                              <div key={item.label} className={`rounded border p-3 ${traceTone[item.state]}`}>
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <span className="text-sm font-medium text-white">{item.label}</span>
+                                  <span className="text-xs uppercase opacity-75">{item.state}</span>
+                                </div>
+                                <p className="mt-1 text-sm">{item.value}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
                       {message.role === "assistant" && message.trace && (
                         <div className="mt-4 rounded border border-white/10 bg-white/6 p-3">

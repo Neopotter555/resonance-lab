@@ -683,7 +683,7 @@ export const RESEARCH_LIBRARY: ResearchItem[] = [
 
 export const ASSISTANT_STARTER = {
   prompt:
-    "Build a 15-minute calm-focus session. Explain what you are checking, what signals I should watch, and how to journal the result without making medical claims.",
+    "Build a 15-minute calm-focus session. Show the loop contract first: objective, inputs watched, safety boundary, deliverable, and next-loop rule. Then explain what signals I should watch and how to journal the result without making medical claims.",
   response:
-    "I will design a bounded sound-and-breath experiment, show the evidence labels, name the safety checks, and give you a short journal loop. Use it for relaxation and self-observation only, not diagnosis or treatment.",
+    "I will design a bounded sound-and-breath experiment, show the loop contract, show the evidence labels, name the safety checks, and give you a short journal loop. Use it for relaxation and self-observation only, not diagnosis or treatment.",
 };
