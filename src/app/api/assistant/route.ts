@@ -1,6 +1,8 @@
 import type {
   AssistantContractItem,
+  AssistantDecisionGate,
   AssistantGuidanceNote,
+  AssistantJournalCue,
   AssistantMode,
   AssistantTraceStep,
   BinauralConfig,
@@ -77,6 +79,9 @@ const summarizeJournal = (entries: Partial<JournalEntry>[]): JournalSummary => {
       typeof entries[0]?.protocolTitle === "string" ? entries[0].protocolTitle ?? null : null,
   };
 };
+
+const getLatestNotes = (entries: Partial<JournalEntry>[]) =>
+  typeof entries[0]?.notes === "string" ? entries[0].notes.toLowerCase() : "";
 
 const getToneDescription = (context: AssistantContext) => {
   if (context.mode === "binaural") {
@@ -269,6 +274,130 @@ const buildGuidance = (
   ];
 };
 
+const buildDecision = (
+  entries: Partial<JournalEntry>[],
+  summary: JournalSummary,
+): AssistantDecisionGate => {
+  const latest = entries[0];
+  const latestNotes = getLatestNotes(entries);
+  const latestMoodBefore = toNumber(latest?.moodBefore);
+  const latestMoodAfter = toNumber(latest?.moodAfter);
+  const latestStress = toNumber(latest?.stressPerception);
+  const latestMoodDelta =
+    latestMoodBefore === null || latestMoodAfter === null ? null : latestMoodAfter - latestMoodBefore;
+  const redSignalFromNotes =
+    /\b(pain|panic|dizz\w*|headache|harsh|pressure|nausea|discomfort|anxiety spike)\b/.test(
+      latestNotes,
+    ) ||
+    (/\bred\b/.test(latestNotes) && !/\b(no|without|none|not)\s+red\b/.test(latestNotes));
+  const yellowSignalFromNotes =
+    /\b(restless|bored|tired|tense|overwhelm\w*|uneasy|irritat\w*)\b/.test(latestNotes) ||
+    (/\byellow\b/.test(latestNotes) && !/\b(no|without|none|not)\s+yellow\b/.test(latestNotes));
+  const hasRedSignal =
+    redSignalFromNotes ||
+    (latestStress !== null && latestStress >= 8) ||
+    (latestMoodDelta !== null && latestMoodDelta <= -2);
+  const hasYellowSignal =
+    yellowSignalFromNotes ||
+    (latestStress !== null && latestStress >= 6) ||
+    (latestMoodDelta !== null && latestMoodDelta < 0) ||
+    (summary.averageStress !== null && summary.averageStress >= 6);
+
+  if (hasRedSignal) {
+    return {
+      state: "stop",
+      title: "Stop or reset",
+      rationale:
+        "The newest journal signal looks uncomfortable enough that the next loop should not optimize intensity.",
+      nextStep:
+        "Stop the experiment for now, lower volume next time, shorten the timer, and only restart when the body feels settled.",
+    };
+  }
+
+  if (hasYellowSignal) {
+    return {
+      state: "soften",
+      title: "Soften the next run",
+      rationale:
+        "The notes or stress data suggest mild friction. The safest next loop is gentler, not stronger.",
+      nextStep:
+        "Keep the same intention, reduce one intensity variable, and repeat before changing frequency or mode.",
+    };
+  }
+
+  if (summary.count > 0) {
+    return {
+      state: "continue",
+      title: "Continue carefully",
+      rationale:
+        "No red or repeated yellow signal is visible in the latest journal data. Keep the loop clean.",
+      nextStep:
+        "Repeat the same setup once, keep volume gentle, and change only one variable after another journal entry.",
+    };
+  }
+
+  return {
+    state: "continue",
+    title: "Run first baseline",
+    rationale: "There is no journal evidence yet, so the system should gather data before judging the loop.",
+    nextStep:
+      "Run the shortest useful session at low volume, save the first journal entry, then ask Analyze to decide the next loop.",
+  };
+};
+
+const buildJournalCues = (
+  assistantMode: AssistantMode,
+  decision: AssistantDecisionGate,
+): AssistantJournalCue[] => {
+  if (assistantMode === "analyze") {
+    return [
+      {
+        label: "Newest change",
+        prompt: "What changed most clearly since the previous entry?",
+        reason: "Analysis should start with the newest user signal, not a story about the whole system.",
+      },
+      {
+        label: "Stable pattern",
+        prompt: "What stayed the same across recent sessions?",
+        reason: "Repeated personal patterns are more useful than one dramatic moment.",
+      },
+      {
+        label: "Signal label",
+        prompt: "Was the session green, yellow, or red, and what body signal proves it?",
+        reason: "The next decision gate depends on observable signals.",
+      },
+      {
+        label: "Next variable",
+        prompt: `Decision gate says "${decision.title}". Which single variable should stay, soften, or change?`,
+        reason: "The next loop should make one clear move, not several guesses.",
+      },
+    ];
+  }
+
+  return [
+    {
+      label: "Before play",
+      prompt: "What state am I testing, and which one variable am I changing?",
+      reason: "A session without a clear starting question is hard to learn from.",
+    },
+    {
+      label: "During play",
+      prompt: "What green, yellow, or red body signals appeared while the audio was running?",
+      reason: "Signals are the safety language of the loop.",
+    },
+    {
+      label: "After play",
+      prompt: "What changed, what stayed the same, and what else was happening today?",
+      reason: "Context keeps the journal honest.",
+    },
+    {
+      label: "Decision gate",
+      prompt: `After journaling, should the next run continue, soften, or stop? Current gate: ${decision.title}.`,
+      reason: "Every loop should end with a simple next action.",
+    },
+  ];
+};
+
 const buildActions = (context: AssistantContext, summary: JournalSummary) => {
   const activeProtocol = context.activeProtocol;
   const duration =
@@ -380,6 +509,7 @@ export async function POST(request: Request) {
   const journalEntries = getEntries(context.journalEntries);
   const summary = summarizeJournal(journalEntries);
   const assistantMode = inferAssistantMode(prompt);
+  const decision = buildDecision(journalEntries, summary);
 
   if (!prompt) {
     return Response.json(
@@ -400,6 +530,8 @@ export async function POST(request: Request) {
     sections: buildSections(prompt, context, summary),
     contract: buildContract(prompt, context, summary, assistantMode),
     guidance: buildGuidance(context, summary, assistantMode),
+    decision,
+    journalCues: buildJournalCues(assistantMode, decision),
     actions: buildActions(context, summary),
     checks: buildChecks(),
     signals: buildSignals(),

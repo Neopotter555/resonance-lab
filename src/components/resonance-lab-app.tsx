@@ -47,7 +47,9 @@ import {
 } from "@/lib/resonance-content";
 import type {
   AssistantContractItem,
+  AssistantDecisionGate,
   AssistantGuidanceNote,
+  AssistantJournalCue,
   AssistantMessage,
   AssistantTraceStep,
   BinauralConfig,
@@ -89,10 +91,57 @@ const traceTone: Record<AssistantTraceStep["state"], string> = {
   stop: "border-rose-300/30 bg-rose-400/10 text-rose-100",
 };
 
+const decisionTone: Record<AssistantDecisionGate["state"], string> = {
+  continue: "border-emerald-300/30 bg-emerald-300/10 text-emerald-100",
+  soften: "border-amber-300/30 bg-amber-300/10 text-amber-100",
+  stop: "border-rose-300/30 bg-rose-400/10 text-rose-100",
+};
+
 const modeLabels: Record<FrequencyMode, string> = {
   pure: "Pure tones",
   binaural: "Binaural beat",
   isochronic: "Isochronic pulse",
+};
+
+const starterDecision: AssistantDecisionGate = {
+  state: "continue",
+  title: "Run first baseline",
+  rationale:
+    "There is no journal evidence yet, so the system starts by collecting a clean first entry.",
+  nextStep:
+    "Run short and low volume, then save the first journal note before changing settings.",
+};
+
+const starterJournalCues: AssistantJournalCue[] = [
+  {
+    label: "Before play",
+    prompt: "What state am I testing, and which one variable am I changing?",
+    reason: "A clear starting question makes the first run useful.",
+  },
+  {
+    label: "During play",
+    prompt: "What green, yellow, or red body signals appeared while the audio was running?",
+    reason: "Signals decide whether the next loop continues, softens, or stops.",
+  },
+  {
+    label: "After play",
+    prompt: "What changed, what stayed the same, and what else was happening today?",
+    reason: "Context keeps the journal honest.",
+  },
+  {
+    label: "Decision gate",
+    prompt: "After journaling, should the next run continue, soften, or stop?",
+    reason: "Every session should end with one simple next action.",
+  },
+];
+
+const fallbackDecision: AssistantDecisionGate = {
+  state: "soften",
+  title: "Soften until assistant returns",
+  rationale:
+    "The assistant route did not complete, so the safest loop is conservative and low intensity.",
+  nextStep:
+    "Keep the current intention, lower one intensity variable, journal the result, and retry Analyze after saving.",
 };
 
 const createId = () =>
@@ -435,6 +484,8 @@ export function ResonanceLabApp() {
           state: "watch",
         },
       ],
+      decision: starterDecision,
+      journalCues: starterJournalCues,
       nextPrompt:
         "After I finish my first low-volume session and save a journal entry, analyze the newest entry. Show what changed, what stayed the same, green/yellow/red signals, one safety note, and the single next variable to keep or change. Keep research support, hypothesis, historical teaching, and user experience separate.",
     },
@@ -1156,6 +1207,8 @@ export function ResonanceLabApp() {
         signals?: string[];
         contract?: AssistantContractItem[];
         guidance?: AssistantGuidanceNote[];
+        decision?: AssistantDecisionGate;
+        journalCues?: AssistantJournalCue[];
         trace?: AssistantTraceStep[];
         nextPrompt?: string;
       };
@@ -1178,6 +1231,8 @@ export function ResonanceLabApp() {
           signals: payload.signals,
           contract: payload.contract,
           guidance: payload.guidance,
+          decision: payload.decision,
+          journalCues: payload.journalCues,
           trace: payload.trace,
           nextPrompt: payload.nextPrompt,
         },
@@ -1269,6 +1324,8 @@ export function ResonanceLabApp() {
               state: "ready",
             },
           ],
+          decision: fallbackDecision,
+          journalCues: starterJournalCues,
           nextPrompt:
             "After I run one short low-volume session and save a journal entry, analyze the newest entry cautiously. Identify green/yellow/red signals, one safety boundary, and one next variable to keep or change.",
         },
@@ -1293,6 +1350,21 @@ export function ResonanceLabApp() {
       title: "Next loop prompt loaded",
       detail:
         "The assistant prompt now contains the next analysis loop. Run it after the session and journal entry are complete.",
+      tone: "cyan",
+    });
+  };
+
+  const applyJournalCues = (cues: AssistantJournalCue[]) => {
+    if (cues.length === 0) return;
+    const cueText = cues.map((cue) => `${cue.label}: ${cue.prompt}`).join("\n");
+    setJournalDraft((current) => ({
+      ...current,
+      notes: current.notes.trim() ? `${current.notes.trim()}\n\n${cueText}` : cueText,
+    }));
+    recordGuideEvent({
+      title: "Journal cues loaded",
+      detail:
+        "The assistant's journal cues were added to the notes field so the next entry has a clean structure.",
       tone: "cyan",
     });
   };
@@ -2572,6 +2644,63 @@ export function ResonanceLabApp() {
                           </div>
                         </div>
                       )}
+
+                      {message.role === "assistant" && message.decision && (
+                        <div className={`mt-4 rounded border p-3 ${decisionTone[message.decision.state]}`}>
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <div className="flex items-center gap-2 text-xs font-semibold uppercase">
+                                <Gauge size={14} />
+                                Decision gate
+                              </div>
+                              <h3 className="mt-2 text-base font-semibold text-white">
+                                {message.decision.title}
+                              </h3>
+                            </div>
+                            <span className="rounded border border-current/25 px-2 py-1 text-xs uppercase opacity-80">
+                              {message.decision.state}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-sm">{message.decision.rationale}</p>
+                          <p className="mt-3 rounded border border-white/10 bg-slate-950/45 p-3 text-sm text-slate-100">
+                            {message.decision.nextStep}
+                          </p>
+                        </div>
+                      )}
+
+                      {message.role === "assistant" &&
+                        Array.isArray(message.journalCues) &&
+                        message.journalCues.length > 0 && (
+                          <div className="mt-4 rounded border border-white/10 bg-white/6 p-3">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div>
+                                <div className="flex items-center gap-2 text-xs font-semibold uppercase text-emerald-200">
+                                  <BookOpen size={14} />
+                                  Journal cues
+                                </div>
+                                <p className="mt-2 text-sm text-slate-300">
+                                  Add these prompts to your notes before saving the next entry.
+                                </p>
+                              </div>
+                              <ControlButton
+                                title="Use journal cues"
+                                onClick={() => applyJournalCues(message.journalCues ?? [])}
+                              >
+                                <Plus size={16} />
+                                Use cues
+                              </ControlButton>
+                            </div>
+                            <div className="mt-3 grid gap-2">
+                              {message.journalCues.map((cue) => (
+                                <div key={cue.label} className="rounded border border-white/10 bg-slate-950/45 p-3">
+                                  <div className="text-sm font-medium text-white">{cue.label}</div>
+                                  <p className="mt-1 text-sm text-slate-200">{cue.prompt}</p>
+                                  <p className="mt-2 text-xs text-slate-500">{cue.reason}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
 
                       {message.role === "assistant" && message.trace && (
                         <div className="mt-4 rounded border border-white/10 bg-white/6 p-3">

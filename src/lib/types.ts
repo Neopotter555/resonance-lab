@@ -130,6 +130,21 @@ export interface AssistantGuidanceNote {
   state: "ready" | "watch" | "stop";
 }
 
+export type AssistantDecisionState = "continue" | "soften" | "stop";
+
+export interface AssistantDecisionGate {
+  state: AssistantDecisionState;
+  title: string;
+  rationale: string;
+  nextStep: string;
+}
+
+export interface AssistantJournalCue {
+  label: string;
+  prompt: string;
+  reason: string;
+}
+
 export interface AssistantMessage {
   id: string;
   role: "user" | "assistant";
@@ -139,6 +154,8 @@ export interface AssistantMessage {
   sections?: Record<EvidenceLevel, string>;
   contract?: AssistantContractItem[];
   guidance?: AssistantGuidanceNote[];
+  decision?: AssistantDecisionGate;
+  journalCues?: AssistantJournalCue[];
   actions?: string[];
   checks?: string[];
   signals?: string[];

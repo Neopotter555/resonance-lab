@@ -131,6 +131,11 @@ async function run() {
       guidancePhases: Array.isArray(payload.guidance)
         ? payload.guidance.map((item) => item.phase)
         : [],
+      decisionState: payload.decision?.state,
+      decisionTitle: payload.decision?.title,
+      journalCueLabels: Array.isArray(payload.journalCues)
+        ? payload.journalCues.map((item) => item.label)
+        : [],
       nextPrompt:
         typeof payload.nextPrompt === "string" &&
         payload.nextPrompt.includes("analyze the newest journal entry"),
@@ -139,7 +144,10 @@ async function run() {
         analyzePayload.assistantMode === "analyze" &&
         Array.isArray(analyzePayload.guidance) &&
         analyzePayload.guidance.some((item) => item.phase === "Analyze newest entry") &&
-        analyzePayload.guidance.some((item) => item.phase === "Decision rule"),
+        analyzePayload.guidance.some((item) => item.phase === "Decision rule") &&
+        analyzePayload.decision?.title === "Continue carefully" &&
+        Array.isArray(analyzePayload.journalCues) &&
+        analyzePayload.journalCues.some((item) => item.label === "Newest change"),
     };
   });
 
@@ -159,6 +167,10 @@ async function run() {
       apiTrace.contractLabels.includes("Loop rule") &&
       apiTrace.guidancePhases.includes("Before session") &&
       apiTrace.guidancePhases.includes("Next loop") &&
+      apiTrace.decisionState === "continue" &&
+      apiTrace.decisionTitle === "Run first baseline" &&
+      apiTrace.journalCueLabels.includes("Before play") &&
+      apiTrace.journalCueLabels.includes("Decision gate") &&
       apiTrace.analyze &&
       apiTrace.nextPrompt,
     preflightVisible: await visible(page, "Assistant preflight"),
@@ -175,6 +187,9 @@ async function run() {
     starterTrace: await visible(page, "Operator trace"),
     starterContract: await visible(page, "Loop contract"),
     starterGuidance: await visible(page, "Guidance notes"),
+    starterDecision: await visible(page, "Run first baseline"),
+    starterJournalCues:
+      (await visible(page, "Journal cues")) && (await visible(page, "Before play")),
     starterAskMode: await visible(page, "Ask mode"),
     contractObjective: await visible(page, "Objective"),
     contractLoopRule: await visible(page, "Loop rule"),
@@ -193,10 +208,16 @@ async function run() {
     journalSaved: false,
     askTrace: false,
     askGuidance: false,
+    askDecision: false,
+    askJournalCues: false,
+    journalCuesLoaded: false,
+    journalCueNotes: false,
     nextPromptCard: false,
     nextPromptLoaded: false,
     analyzeTrace: false,
     analyzeGuidance: false,
+    analyzeDecision: false,
+    analyzeJournalCues: false,
     scheduleGuidance: false,
     habitSignal: "",
     exportGuidance: false,
@@ -259,6 +280,14 @@ async function run() {
   checks.askTrace = (await visible(page, "Prompt parsed")) && (await visible(page, "Deliverable assembled"));
   checks.askContract = (await visible(page, "Inputs watched")) && (await visible(page, "Deliverable"));
   checks.askGuidance = (await visible(page, "During session")) && (await visible(page, "After session"));
+  checks.askDecision = await visible(page, "Continue carefully");
+  checks.askJournalCues = await visible(page, "Journal cues");
+  await page.getByTitle("Use journal cues").last().click();
+  checks.journalCuesLoaded = await waitForText(page, "Journal cues loaded");
+  const cueNotes = await page
+    .getByPlaceholder("What changed, what stayed the same, and what else was happening today?")
+    .inputValue();
+  checks.journalCueNotes = cueNotes.includes("Before play:") || cueNotes.includes("Newest change:");
   checks.nextPromptCard = await visible(page, "Next loop prompt");
   checks.compassNextPromptFocus = await visible(page, "Load the next loop prompt");
   await page.getByTitle("Load next loop prompt").last().click();
@@ -272,6 +301,8 @@ async function run() {
     (await visible(page, "Analyze mode")) &&
     (await visible(page, "Analyze newest entry")) &&
     (await visible(page, "Decision rule"));
+  checks.analyzeDecision = await visible(page, "Continue carefully");
+  checks.analyzeJournalCues = await visible(page, "Newest change");
 
   await page.locator('input[type="datetime-local"]').fill(tomorrowLocalInputValue());
   await page.getByTitle("Schedule active protocol").click();
