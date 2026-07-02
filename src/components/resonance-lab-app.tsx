@@ -47,6 +47,7 @@ import {
 } from "@/lib/resonance-content";
 import type {
   AssistantContractItem,
+  AssistantGuidanceNote,
   AssistantMessage,
   AssistantTraceStep,
   BinauralConfig,
@@ -334,6 +335,7 @@ export function ResonanceLabApp() {
       role: "assistant",
       content: ASSISTANT_STARTER.response,
       provider: "local-safety-fallback",
+      assistantMode: "ask",
       sections: {
         "Research-supported":
           "Comfortable, low-volume audio and structured breathing can be studied as relaxation supports, but individual results vary.",
@@ -404,6 +406,32 @@ export function ResonanceLabApp() {
         {
           label: "Loop rule",
           value: "Collect at least one journal entry before treating any pattern as personally meaningful.",
+          state: "watch",
+        },
+      ],
+      guidance: [
+        {
+          phase: "Before session",
+          instruction: "Choose one intention, one audio variable, and a gentle volume.",
+          reason: "A clear setup helps the first run become useful evidence instead of a vague experience.",
+          state: "ready",
+        },
+        {
+          phase: "During session",
+          instruction: "Watch breath, shoulders, attention, and red discomfort signals.",
+          reason: "The body signal decides whether to continue, soften, or stop.",
+          state: "ready",
+        },
+        {
+          phase: "After session",
+          instruction: "Save a journal entry before changing any setting.",
+          reason: "Immediate notes make the next analysis honest.",
+          state: "ready",
+        },
+        {
+          phase: "Next loop",
+          instruction: "Load the next prompt after journaling and repeat with one variable.",
+          reason: "The system improves through clean loops, not one dramatic result.",
           state: "watch",
         },
       ],
@@ -1122,10 +1150,12 @@ export function ResonanceLabApp() {
         answer: string;
         provider: string;
         sections: Record<EvidenceLevel, string>;
+        assistantMode?: "ask" | "analyze";
         actions?: string[];
         checks?: string[];
         signals?: string[];
         contract?: AssistantContractItem[];
+        guidance?: AssistantGuidanceNote[];
         trace?: AssistantTraceStep[];
         nextPrompt?: string;
       };
@@ -1141,11 +1171,13 @@ export function ResonanceLabApp() {
           role: "assistant",
           content: payload.answer,
           provider: payload.provider,
+          assistantMode: payload.assistantMode,
           sections: payload.sections,
           actions: payload.actions,
           checks: payload.checks,
           signals: payload.signals,
           contract: payload.contract,
+          guidance: payload.guidance,
           trace: payload.trace,
           nextPrompt: payload.nextPrompt,
         },
@@ -1164,6 +1196,7 @@ export function ResonanceLabApp() {
           content:
             "The assistant service is offline, so this local fallback is keeping the safety protocol active: change one variable, use low volume, and record subjective observations.",
           provider: "local-error-fallback",
+          assistantMode: "ask",
           trace: [
             {
               title: "Route failed",
@@ -1214,6 +1247,26 @@ export function ResonanceLabApp() {
               label: "Loop rule",
               value: "Save a journal entry before asking for analysis.",
               state: "watch",
+            },
+          ],
+          guidance: [
+            {
+              phase: "Before session",
+              instruction: "Keep the current protocol and change only one variable.",
+              reason: "The local fallback cannot reason deeply, so it keeps the setup simple.",
+              state: "watch",
+            },
+            {
+              phase: "During session",
+              instruction: "Run short and low volume, then stop on discomfort.",
+              reason: "Safety stays active even when the assistant route fails.",
+              state: "ready",
+            },
+            {
+              phase: "After session",
+              instruction: "Save the journal entry before trying again.",
+              reason: "The next assistant response needs your latest observation.",
+              state: "ready",
             },
           ],
           nextPrompt:
@@ -2466,9 +2519,16 @@ export function ResonanceLabApp() {
                         <span className="text-sm font-medium text-white">
                           {message.role === "user" ? "You" : "Assistant"}
                         </span>
-                        {message.provider && (
-                          <span className="text-xs text-slate-500">{message.provider}</span>
-                        )}
+                        <span className="flex flex-wrap items-center justify-end gap-2">
+                          {message.assistantMode && (
+                            <span className="rounded border border-amber-300/25 bg-amber-300/10 px-2 py-1 text-xs uppercase text-amber-100">
+                              {message.assistantMode === "analyze" ? "Analyze mode" : "Ask mode"}
+                            </span>
+                          )}
+                          {message.provider && (
+                            <span className="text-xs text-slate-500">{message.provider}</span>
+                          )}
+                        </span>
                       </div>
                       <p className="mt-3 text-sm text-slate-300">{message.content}</p>
 
@@ -2486,6 +2546,27 @@ export function ResonanceLabApp() {
                                   <span className="text-xs uppercase opacity-75">{item.state}</span>
                                 </div>
                                 <p className="mt-1 text-sm">{item.value}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {message.role === "assistant" && message.guidance && (
+                        <div className="mt-4 rounded border border-white/10 bg-white/6 p-3">
+                          <div className="flex items-center gap-2 text-xs font-semibold uppercase text-emerald-200">
+                            <BookOpen size={14} />
+                            Guidance notes
+                          </div>
+                          <div className="mt-3 grid gap-2">
+                            {message.guidance.map((note) => (
+                              <div key={note.phase} className={`rounded border p-3 ${traceTone[note.state]}`}>
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <span className="text-sm font-medium text-white">{note.phase}</span>
+                                  <span className="text-xs uppercase opacity-75">{note.state}</span>
+                                </div>
+                                <p className="mt-1 text-sm">{note.instruction}</p>
+                                <p className="mt-2 text-xs opacity-75">{note.reason}</p>
                               </div>
                             ))}
                           </div>

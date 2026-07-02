@@ -93,9 +93,32 @@ async function run() {
       }),
     });
     const payload = await response.json();
+    const analyzeResponse = await fetch("/api/assistant", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: "Analyze my recent journal entries and choose the next safest loop.",
+        context: {
+          mode: "binaural",
+          binaural: { carrier: 220, beat: 8 },
+          journalEntries: [
+            {
+              protocolTitle: "Smoke protocol",
+              moodBefore: 4,
+              moodAfter: 6,
+              focus: 7,
+              stressPerception: 3,
+              notes: "Green signal: calmer breathing.",
+            },
+          ],
+        },
+      }),
+    });
+    const analyzePayload = await analyzeResponse.json();
 
     return {
       ok: response.ok,
+      assistantMode: payload.assistantMode,
       traceTitles: Array.isArray(payload.trace)
         ? payload.trace.map((step) => step.title)
         : [],
@@ -105,9 +128,18 @@ async function run() {
       contractLabels: Array.isArray(payload.contract)
         ? payload.contract.map((item) => item.label)
         : [],
+      guidancePhases: Array.isArray(payload.guidance)
+        ? payload.guidance.map((item) => item.phase)
+        : [],
       nextPrompt:
         typeof payload.nextPrompt === "string" &&
         payload.nextPrompt.includes("analyze the newest journal entry"),
+      analyze:
+        analyzeResponse.ok &&
+        analyzePayload.assistantMode === "analyze" &&
+        Array.isArray(analyzePayload.guidance) &&
+        analyzePayload.guidance.some((item) => item.phase === "Analyze newest entry") &&
+        analyzePayload.guidance.some((item) => item.phase === "Decision rule"),
     };
   });
 
@@ -117,6 +149,7 @@ async function run() {
   const checks = {
     apiTrace:
       apiTrace.ok &&
+      apiTrace.assistantMode === "ask" &&
       apiTrace.traceTitles.includes("Prompt parsed") &&
       apiTrace.traceTitles.includes("Deliverable assembled") &&
       apiTrace.actions >= 4 &&
@@ -124,6 +157,9 @@ async function run() {
       apiTrace.signals >= 3 &&
       apiTrace.contractLabels.includes("Objective") &&
       apiTrace.contractLabels.includes("Loop rule") &&
+      apiTrace.guidancePhases.includes("Before session") &&
+      apiTrace.guidancePhases.includes("Next loop") &&
+      apiTrace.analyze &&
       apiTrace.nextPrompt,
     preflightVisible: await visible(page, "Assistant preflight"),
     promptPreflight: await visible(page, "Prompt clarity"),
@@ -138,6 +174,8 @@ async function run() {
     compassReadyFocus: false,
     starterTrace: await visible(page, "Operator trace"),
     starterContract: await visible(page, "Loop contract"),
+    starterGuidance: await visible(page, "Guidance notes"),
+    starterAskMode: await visible(page, "Ask mode"),
     contractObjective: await visible(page, "Objective"),
     contractLoopRule: await visible(page, "Loop rule"),
     modeGuidance: false,
@@ -154,9 +192,11 @@ async function run() {
     protocolSaved: false,
     journalSaved: false,
     askTrace: false,
+    askGuidance: false,
     nextPromptCard: false,
     nextPromptLoaded: false,
     analyzeTrace: false,
+    analyzeGuidance: false,
     scheduleGuidance: false,
     habitSignal: "",
     exportGuidance: false,
@@ -218,6 +258,7 @@ async function run() {
   await waitForText(page, "Assistant loop completed", 15000);
   checks.askTrace = (await visible(page, "Prompt parsed")) && (await visible(page, "Deliverable assembled"));
   checks.askContract = (await visible(page, "Inputs watched")) && (await visible(page, "Deliverable"));
+  checks.askGuidance = (await visible(page, "During session")) && (await visible(page, "After session"));
   checks.nextPromptCard = await visible(page, "Next loop prompt");
   checks.compassNextPromptFocus = await visible(page, "Load the next loop prompt");
   await page.getByTitle("Load next loop prompt").last().click();
@@ -227,6 +268,10 @@ async function run() {
   await page.getByTitle("Analyze journal entries").click();
   await waitForText(page, "Assistant loop completed", 15000);
   checks.analyzeTrace = await visible(page, "Journal evidence checked");
+  checks.analyzeGuidance =
+    (await visible(page, "Analyze mode")) &&
+    (await visible(page, "Analyze newest entry")) &&
+    (await visible(page, "Decision rule"));
 
   await page.locator('input[type="datetime-local"]').fill(tomorrowLocalInputValue());
   await page.getByTitle("Schedule active protocol").click();

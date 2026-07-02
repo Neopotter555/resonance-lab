@@ -121,13 +121,24 @@ export interface AssistantContractItem {
   state: "ready" | "watch" | "stop";
 }
 
+export type AssistantMode = "ask" | "analyze";
+
+export interface AssistantGuidanceNote {
+  phase: string;
+  instruction: string;
+  reason: string;
+  state: "ready" | "watch" | "stop";
+}
+
 export interface AssistantMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
   provider?: string;
+  assistantMode?: AssistantMode;
   sections?: Record<EvidenceLevel, string>;
   contract?: AssistantContractItem[];
+  guidance?: AssistantGuidanceNote[];
   actions?: string[];
   checks?: string[];
   signals?: string[];

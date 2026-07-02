@@ -1,5 +1,7 @@
 import type {
   AssistantContractItem,
+  AssistantGuidanceNote,
+  AssistantMode,
   AssistantTraceStep,
   BinauralConfig,
   EvidenceLevel,
@@ -47,6 +49,9 @@ const getEntries = (entries: unknown[] | undefined): Partial<JournalEntry>[] =>
   Array.isArray(entries)
     ? entries.filter((entry): entry is Partial<JournalEntry> => typeof entry === "object" && entry !== null)
     : [];
+
+const inferAssistantMode = (prompt: string): AssistantMode =>
+  /analy[sz]e|journal|entry|entries|pattern|trend|what changed|data:/i.test(prompt) ? "analyze" : "ask";
 
 const summarizeJournal = (entries: Partial<JournalEntry>[]): JournalSummary => {
   const moodDeltas = entries
@@ -105,7 +110,12 @@ const buildSections = (
     : `No journal baseline yet. After this prompt, record expectation, actual sensation, mood before/after, focus, energy, sleep quality, stress, and context: "${prompt.slice(0, 160)}"`,
 });
 
-const buildAnswer = (prompt: string, context: AssistantContext, summary: JournalSummary) => {
+const buildAnswer = (
+  prompt: string,
+  context: AssistantContext,
+  summary: JournalSummary,
+  assistantMode: AssistantMode,
+) => {
   const activeProtocol = context.activeProtocol;
   const title = typeof activeProtocol?.title === "string" ? activeProtocol.title : "your current protocol";
   const duration =
@@ -118,7 +128,7 @@ const buildAnswer = (prompt: string, context: AssistantContext, summary: Journal
     : "Because there is no journal baseline yet, the first mission is to collect clean before-and-after notes.";
 
   return [
-    `What I am doing: I am turning your request into a bounded ${duration}-minute ${mode} experiment for ${title}.`,
+    `What I am doing: I am running ${assistantMode === "analyze" ? "Analyze" : "Ask"} mode and turning your request into a bounded ${duration}-minute ${mode} experiment for ${title}.`,
     "What I am trying to deliver: a safe repeatable loop, not a mystical verdict or medical answer.",
     journalLine,
     "How I will think: I will keep research support, hypothesis, historical teaching, and user experience in separate lanes.",
@@ -131,6 +141,7 @@ const buildContract = (
   prompt: string,
   context: AssistantContext,
   summary: JournalSummary,
+  assistantMode: AssistantMode,
 ): AssistantContractItem[] => {
   const activeProtocol = context.activeProtocol;
   const title = typeof activeProtocol?.title === "string" ? activeProtocol.title : "current protocol";
@@ -142,6 +153,14 @@ const buildContract = (
   const promptState = prompt.length >= 24 ? "ready" : "watch";
 
   return [
+    {
+      label: "Assistant mode",
+      value:
+        assistantMode === "analyze"
+          ? "Analyze mode: read the newest journal evidence, separate signals from stories, and choose the next safest loop."
+          : "Ask mode: design the session before it runs, make the instructions visible, and keep the claims bounded.",
+      state: "ready",
+    },
     {
       label: "Objective",
       value: `Build a ${duration}-minute ${mode} loop for ${title}; keep the goal to relaxation, attention, and self-observation.`,
@@ -168,6 +187,84 @@ const buildContract = (
         ? "Use the newest journal entry as personal evidence only, then repeat before changing another variable."
         : "Create the first baseline journal entry before asking the system to compare patterns.",
       state: summary.count ? "ready" : "watch",
+    },
+  ];
+};
+
+const buildGuidance = (
+  context: AssistantContext,
+  summary: JournalSummary,
+  assistantMode: AssistantMode,
+): AssistantGuidanceNote[] => {
+  const activeProtocol = context.activeProtocol;
+  const duration =
+    typeof activeProtocol?.durationMinutes === "number" && Number.isFinite(activeProtocol.durationMinutes)
+      ? activeProtocol.durationMinutes
+      : 15;
+  const intention =
+    typeof activeProtocol?.intention === "string" && activeProtocol.intention.trim()
+      ? sentenceEnd(activeProtocol.intention)
+      : "observe one body or attention signal without forcing a result";
+
+  if (assistantMode === "analyze") {
+    return [
+      {
+        phase: "Analyze newest entry",
+        instruction: summary.count
+          ? "Start with the newest journal entry before looking at averages."
+          : "No journal entries are available, so treat this as a baseline-building loop.",
+        reason: summary.count
+          ? "The latest entry is the user signal that can change the next run."
+          : "Without a saved entry, analysis should not invent a pattern.",
+        state: summary.count ? "ready" : "watch",
+      },
+      {
+        phase: "Compare personal pattern",
+        instruction: summary.count
+          ? `Compare only personal data: mood ${formatAverage(summary.averageMoodDelta)}, focus ${formatAverage(summary.averageFocus, "/10")}, stress ${formatAverage(summary.averageStress, "/10")}.`
+          : "Collect mood before/after, focus, energy, sleep quality, stress, and context first.",
+        reason: "Personal trend comparison is useful; causal claims about the frequency are not supported.",
+        state: summary.count ? "ready" : "watch",
+      },
+      {
+        phase: "Decision rule",
+        instruction: "Continue if signals are green, soften if yellow repeats, and stop or reset if any red signal appears.",
+        reason: "The system should protect the user before optimizing the experiment.",
+        state: "ready",
+      },
+      {
+        phase: "Next variable",
+        instruction: "Keep the same setup for one more run unless the notes clearly point to one variable to change.",
+        reason: "A clean loop learns from repetition instead of chasing novelty.",
+        state: "ready",
+      },
+    ];
+  }
+
+  return [
+    {
+      phase: "Before session",
+      instruction: `Name the intention: ${intention}. Choose one variable and leave the rest alone.`,
+      reason: "The user needs a clear target before sound begins.",
+      state: "ready",
+    },
+    {
+      phase: "During session",
+      instruction: `Run ${duration} minutes at low volume. Watch breath, shoulders, attention, and any red discomfort signal.`,
+      reason: "The body signals decide whether the loop continues, softens, or stops.",
+      state: "ready",
+    },
+    {
+      phase: "After session",
+      instruction: "Save the journal entry before touching frequency, mode, volume, or intention.",
+      reason: "Notes written before tweaking the setup create cleaner evidence.",
+      state: "ready",
+    },
+    {
+      phase: "Next loop",
+      instruction: "Load the next prompt after journaling, then repeat or change one variable only.",
+      reason: "Looping turns a single session into a guided experiment.",
+      state: "ready",
     },
   ];
 };
@@ -282,6 +379,7 @@ export async function POST(request: Request) {
   const context = body.context ?? {};
   const journalEntries = getEntries(context.journalEntries);
   const summary = summarizeJournal(journalEntries);
+  const assistantMode = inferAssistantMode(prompt);
 
   if (!prompt) {
     return Response.json(
@@ -297,9 +395,11 @@ export async function POST(request: Request) {
       process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY
         ? "local-guardrail-demo-ready-for-provider"
         : "local-safety-fallback",
-    answer: buildAnswer(prompt, context, summary),
+    assistantMode,
+    answer: buildAnswer(prompt, context, summary, assistantMode),
     sections: buildSections(prompt, context, summary),
-    contract: buildContract(prompt, context, summary),
+    contract: buildContract(prompt, context, summary, assistantMode),
+    guidance: buildGuidance(context, summary, assistantMode),
     actions: buildActions(context, summary),
     checks: buildChecks(),
     signals: buildSignals(),
