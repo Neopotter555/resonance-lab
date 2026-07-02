@@ -102,6 +102,9 @@ async function run() {
       actions: payload.actions?.length ?? 0,
       checks: payload.checks?.length ?? 0,
       signals: payload.signals?.length ?? 0,
+      nextPrompt:
+        typeof payload.nextPrompt === "string" &&
+        payload.nextPrompt.includes("analyze the newest journal entry"),
     };
   });
 
@@ -115,7 +118,8 @@ async function run() {
       apiTrace.traceTitles.includes("Deliverable assembled") &&
       apiTrace.actions >= 4 &&
       apiTrace.checks >= 4 &&
-      apiTrace.signals >= 3,
+      apiTrace.signals >= 3 &&
+      apiTrace.nextPrompt,
     preflightVisible: await visible(page, "Assistant preflight"),
     promptPreflight: await visible(page, "Prompt clarity"),
     protocolPreflight: await visible(page, "Protocol context"),
@@ -137,6 +141,8 @@ async function run() {
     protocolSaved: false,
     journalSaved: false,
     askTrace: false,
+    nextPromptCard: false,
+    nextPromptLoaded: false,
     analyzeTrace: false,
     scheduleGuidance: false,
     habitSignal: "",
@@ -197,6 +203,9 @@ async function run() {
   await page.getByTitle("Ask assistant").click();
   await waitForText(page, "Assistant loop completed", 15000);
   checks.askTrace = (await visible(page, "Prompt parsed")) && (await visible(page, "Deliverable assembled"));
+  checks.nextPromptCard = await visible(page, "Next loop prompt");
+  await page.getByTitle("Load next loop prompt").last().click();
+  checks.nextPromptLoaded = await waitForText(page, "Next loop prompt loaded");
 
   await page.getByTitle("Analyze journal entries").click();
   await waitForText(page, "Assistant loop completed", 15000);

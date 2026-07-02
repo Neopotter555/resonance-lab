@@ -125,6 +125,7 @@ export interface AssistantMessage {
   checks?: string[];
   signals?: string[];
   trace?: AssistantTraceStep[];
+  nextPrompt?: string;
 }
 
 export interface ResearchItem {

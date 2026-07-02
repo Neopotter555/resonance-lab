@@ -204,6 +204,26 @@ const buildTrace = (
   ];
 };
 
+const buildNextPrompt = (context: AssistantContext, summary: JournalSummary) => {
+  const activeProtocol = context.activeProtocol;
+  const title = typeof activeProtocol?.title === "string" ? activeProtocol.title : "my current protocol";
+  const duration =
+    typeof activeProtocol?.durationMinutes === "number" && Number.isFinite(activeProtocol.durationMinutes)
+      ? activeProtocol.durationMinutes
+      : 15;
+  const mode = context.mode ? modeLabel[context.mode] : "audio";
+  const journalFrame = summary.count
+    ? "Use my latest journal entries and compare only my own before/after pattern."
+    : "Assume I have just saved my first journal entry after the session.";
+
+  return [
+    `After I complete the ${duration}-minute ${mode} session for "${title}", analyze the newest journal entry.`,
+    journalFrame,
+    "Show what changed, what stayed the same, green/yellow/red signals, one safety note, and the single next variable to keep or change.",
+    "Keep research support, hypothesis, historical teaching, and user experience separate.",
+  ].join(" ");
+};
+
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as {
     prompt?: string;
@@ -235,5 +255,6 @@ export async function POST(request: Request) {
     checks: buildChecks(),
     signals: buildSignals(),
     trace: buildTrace(prompt, context, summary),
+    nextPrompt: buildNextPrompt(context, summary),
   });
 }

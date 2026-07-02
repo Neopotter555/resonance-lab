@@ -376,6 +376,8 @@ export function ResonanceLabApp() {
           state: "watch",
         },
       ],
+      nextPrompt:
+        "After I finish my first low-volume session and save a journal entry, analyze the newest entry. Show what changed, what stayed the same, green/yellow/red signals, one safety note, and the single next variable to keep or change. Keep research support, hypothesis, historical teaching, and user experience separate.",
     },
   ]);
   const [journalDraft, setJournalDraft] = useState({
@@ -1013,6 +1015,7 @@ export function ResonanceLabApp() {
         checks?: string[];
         signals?: string[];
         trace?: AssistantTraceStep[];
+        nextPrompt?: string;
       };
 
       if (!response.ok) {
@@ -1031,6 +1034,7 @@ export function ResonanceLabApp() {
           checks: payload.checks,
           signals: payload.signals,
           trace: payload.trace,
+          nextPrompt: payload.nextPrompt,
         },
       ]);
       recordGuideEvent({
@@ -1072,6 +1076,8 @@ export function ResonanceLabApp() {
             "Yellow: restlessness or uncertainty means soften the experiment.",
             "Red: discomfort means stop and reset.",
           ],
+          nextPrompt:
+            "After I run one short low-volume session and save a journal entry, analyze the newest entry cautiously. Identify green/yellow/red signals, one safety boundary, and one next variable to keep or change.",
         },
       ]);
       recordGuideEvent({
@@ -1086,6 +1092,28 @@ export function ResonanceLabApp() {
 
   const askAssistant = () => {
     void submitAssistantPrompt();
+  };
+
+  const loadNextPrompt = (nextPrompt: string) => {
+    setAssistantPrompt(nextPrompt);
+    recordGuideEvent({
+      title: "Next loop prompt loaded",
+      detail:
+        "The assistant prompt now contains the next analysis loop. Run it after the session and journal entry are complete.",
+      tone: "cyan",
+    });
+  };
+
+  const draftJourneyPrompt = () => {
+    setAssistantPrompt(
+      `Generate a ${activeProtocol.durationMinutes}-minute ${activeProtocol.module.toLowerCase()} meditation journey using my intention: ${activeProtocol.intention}. Separate research, hypothesis, historical teaching, and user experience.`,
+    );
+    recordGuideEvent({
+      title: "Journey prompt drafted",
+      detail:
+        "A guided journey prompt is loaded. Ask the assistant to turn it into a bounded session before pressing play.",
+      tone: "cyan",
+    });
   };
 
   const renderModeControls = () => {
@@ -2233,6 +2261,7 @@ export function ResonanceLabApp() {
                         "A clear separation between research, hypothesis, tradition, and personal report.",
                         "Green, yellow, and red signals for deciding whether to continue, soften, or stop.",
                         "A journal loop that a first-time user can follow without guessing.",
+                        "A next prompt to load after journaling so the loop keeps improving.",
                       ].map((item) => (
                         <div key={item} className="flex gap-2">
                           <Check className="mt-0.5 shrink-0 text-emerald-200" size={14} />
@@ -2313,6 +2342,32 @@ export function ResonanceLabApp() {
                               </div>
                             ) : null,
                           )}
+                        </div>
+                      )}
+
+                      {message.role === "assistant" && message.nextPrompt && (
+                        <div className="mt-4 rounded border border-sky-300/30 bg-sky-300/10 p-3 text-sky-100">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <div className="flex items-center gap-2 text-xs font-semibold uppercase text-sky-100">
+                                <Sparkles size={14} />
+                                Next loop prompt
+                              </div>
+                              <p className="mt-2 text-sm">
+                                Use this after the session is complete and the journal entry is saved.
+                              </p>
+                            </div>
+                            <ControlButton
+                              title="Load next loop prompt"
+                              onClick={() => loadNextPrompt(message.nextPrompt ?? "")}
+                            >
+                              <ChevronRight size={16} />
+                              Load prompt
+                            </ControlButton>
+                          </div>
+                          <p className="mt-3 rounded border border-white/10 bg-slate-950/50 p-3 text-sm text-slate-200">
+                            {message.nextPrompt}
+                          </p>
                         </div>
                       )}
 
@@ -2470,11 +2525,7 @@ export function ResonanceLabApp() {
                   <div className="mt-4 grid gap-2">
                     <ControlButton
                       title="Draft AI journey prompt"
-                      onClick={() =>
-                        setAssistantPrompt(
-                          `Generate a ${activeProtocol.durationMinutes}-minute ${activeProtocol.module.toLowerCase()} meditation journey using my intention: ${activeProtocol.intention}. Separate research, hypothesis, historical teaching, and user experience.`,
-                        )
-                      }
+                      onClick={draftJourneyPrompt}
                       variant="primary"
                     >
                       <Sparkles size={16} />
