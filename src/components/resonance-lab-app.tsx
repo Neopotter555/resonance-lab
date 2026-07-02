@@ -113,6 +113,8 @@ interface GuideEvent {
   tone: "gold" | "cyan" | "rose";
 }
 
+type LoopCompassStatus = "done" | "now" | "next";
+
 function getStoredValue<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
   const raw = window.localStorage.getItem(key);
@@ -606,6 +608,81 @@ export function ResonanceLabApp() {
       state: "ready",
     },
   ];
+  const hasRunAudio =
+    isPlaying ||
+    timerActive ||
+    journalEntries.length > 0 ||
+    guideEvents.some((event) => event.title === "Audio session started" || event.title === "Audio stopped");
+  const hasAssistantLoop = assistantMessages.some(
+    (message) => message.role === "assistant" && message.id !== "starter",
+  );
+  const nextPromptWasLoaded = guideEvents.some((event) => event.title === "Next loop prompt loaded");
+  const loopFocus = isPlaying
+    ? "Watch comfort signals"
+    : !hasRunAudio
+      ? "Press play softly"
+      : journalEntries.length === 0
+        ? "Save the first journal entry"
+        : !hasAssistantLoop
+          ? "Ask or Analyze the journal"
+          : !nextPromptWasLoaded
+            ? "Load the next loop prompt"
+            : "Next loop ready";
+  const loopFocusDetail = isPlaying
+    ? "Stay at comfortable volume. Green is calmer breath, yellow is restlessness, red means stop."
+    : !hasRunAudio
+      ? `Run ${activeProtocol.title} at low volume with ${currentAudioVariable}.`
+      : journalEntries.length === 0
+        ? "Record before and after state before changing frequency, mode, volume, or intention."
+        : !hasAssistantLoop
+          ? "Use Ask for a plan or Analyze journal to compare only your saved personal data."
+          : !nextPromptWasLoaded
+            ? "Load the assistant's next prompt so the next run starts from the latest observation."
+            : "Repeat the loop with one variable held steady and one decision made from your notes.";
+  const loopCompassSteps: {
+    title: string;
+    detail: string;
+    href: string;
+    status: LoopCompassStatus;
+  }[] = [
+    {
+      title: "1. Set one variable",
+      detail: currentAudioVariable,
+      href: "#frequency",
+      status: hasRunAudio || journalEntries.length > 0 ? "done" : "now",
+    },
+    {
+      title: "2. Play gently",
+      detail: isPlaying ? "Audio is running now" : "Low volume, no multitasking",
+      href: "#frequency",
+      status: isPlaying ? "now" : hasRunAudio ? "done" : "next",
+    },
+    {
+      title: "3. Journal immediately",
+      detail: journalEntries.length
+        ? `${journalEntries.length} saved entr${journalEntries.length === 1 ? "y" : "ies"}`
+        : "Before, after, context, signals",
+      href: "#journal",
+      status: journalEntries.length ? "done" : hasRunAudio ? "now" : "next",
+    },
+    {
+      title: "4. Ask or Analyze",
+      detail: hasAssistantLoop ? "Assistant loop completed" : "Get next actions and safety checks",
+      href: "#assistant",
+      status: hasAssistantLoop ? "done" : journalEntries.length ? "now" : "next",
+    },
+    {
+      title: "5. Load next loop",
+      detail: nextPromptWasLoaded ? "Prompt loaded for the next run" : "Continue from newest notes",
+      href: "#assistant",
+      status: nextPromptWasLoaded ? "done" : hasAssistantLoop ? "now" : "next",
+    },
+  ];
+  const loopCompassTone: Record<LoopCompassStatus, string> = {
+    done: "border-emerald-300/30 bg-emerald-300/10 text-emerald-100",
+    now: "border-amber-300/25 bg-amber-300/10 text-amber-100",
+    next: "border-white/10 bg-white/6 text-slate-400",
+  };
 
   const selectMode = (nextMode: FrequencyMode) => {
     if (nextMode === mode) return;
@@ -1433,6 +1510,40 @@ export function ResonanceLabApp() {
                     detail="Assistant route limit"
                     icon={<Bot size={18} />}
                   />
+                </div>
+
+                <div className="rounded border border-white/10 bg-[var(--panel-bg)] p-4" aria-live="polite">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="section-kicker">Session compass</p>
+                      <h3 className="mt-1 font-medium text-white">{loopFocus}</h3>
+                      <p className="mt-1 max-w-3xl text-sm text-slate-400">{loopFocusDetail}</p>
+                    </div>
+                    <span className="rounded border border-amber-300/25 bg-amber-300/10 px-3 py-1 text-xs uppercase text-amber-100">
+                      Guided loop
+                    </span>
+                  </div>
+                  <div className="mt-4 grid gap-2 md:grid-cols-5">
+                    {loopCompassSteps.map((step) => (
+                      <a
+                        key={step.title}
+                        href={step.href}
+                        className={`group flex min-h-32 flex-col justify-between rounded border p-3 transition hover:bg-white/10 ${loopCompassTone[step.status]}`}
+                      >
+                        <span>
+                          <span className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-medium text-white">{step.title}</span>
+                            <span className="text-[0.66rem] uppercase opacity-75">{step.status}</span>
+                          </span>
+                          <span className="mt-2 block text-sm">{step.detail}</span>
+                        </span>
+                        <span className="mt-3 inline-flex items-center gap-1 text-xs uppercase opacity-80">
+                          Open step
+                          <ChevronRight size={13} />
+                        </span>
+                      </a>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="rounded border border-white/10 bg-[var(--panel-bg)] p-4" aria-live="polite">

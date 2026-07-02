@@ -126,6 +126,11 @@ async function run() {
     audioPreflight: await visible(page, "Audio variable"),
     journalPreflight: await visible(page, "Journal baseline"),
     safetyPreflight: await visible(page, "Safety boundary"),
+    sessionCompass: await visible(page, "Session compass"),
+    compassInitialFocus: await visible(page, "Press play softly"),
+    compassJournalFocus: false,
+    compassNextPromptFocus: false,
+    compassReadyFocus: false,
     starterTrace: await visible(page, "Operator trace"),
     modeGuidance: false,
     toneLayerAdded: false,
@@ -199,13 +204,16 @@ async function run() {
     .fill("Workflow smoke: calm, clear, no red signals.");
   await page.getByTitle("Save journal entry").click();
   checks.journalSaved = await waitForText(page, "Journal entry saved");
+  checks.compassJournalFocus = await waitForText(page, "Ask or Analyze the journal");
 
   await page.getByTitle("Ask assistant").click();
   await waitForText(page, "Assistant loop completed", 15000);
   checks.askTrace = (await visible(page, "Prompt parsed")) && (await visible(page, "Deliverable assembled"));
   checks.nextPromptCard = await visible(page, "Next loop prompt");
+  checks.compassNextPromptFocus = await visible(page, "Load the next loop prompt");
   await page.getByTitle("Load next loop prompt").last().click();
   checks.nextPromptLoaded = await waitForText(page, "Next loop prompt loaded");
+  checks.compassReadyFocus = await waitForText(page, "Next loop ready");
 
   await page.getByTitle("Analyze journal entries").click();
   await waitForText(page, "Assistant loop completed", 15000);
