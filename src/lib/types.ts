@@ -115,6 +115,9 @@ export interface AssistantMessage {
   content: string;
   provider?: string;
   sections?: Record<EvidenceLevel, string>;
+  actions?: string[];
+  checks?: string[];
+  signals?: string[];
 }
 
 export interface ResearchItem {

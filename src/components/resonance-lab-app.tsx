@@ -116,12 +116,14 @@ function safeAverage(values: number[]) {
 
 function ControlButton({
   children,
+  disabled = false,
   onClick,
   title,
   variant = "secondary",
   type = "button",
 }: {
   children: React.ReactNode;
+  disabled?: boolean;
   onClick?: () => void;
   title: string;
   variant?: "primary" | "secondary" | "danger";
@@ -138,8 +140,11 @@ function ControlButton({
     <button
       type={type}
       title={title}
+      disabled={disabled}
       onClick={onClick}
-      className={`inline-flex min-h-10 items-center justify-center gap-2 rounded px-3 py-2 text-sm font-medium transition ${className}`}
+      className={`inline-flex min-h-10 items-center justify-center gap-2 rounded px-3 py-2 text-sm font-medium transition ${
+        disabled ? "cursor-not-allowed opacity-60" : ""
+      } ${className}`}
     >
       {children}
     </button>
@@ -311,6 +316,21 @@ export function ResonanceLabApp() {
         "User experience":
           "Your journal entries are personal observations. They are useful for reflection, not proof of universal effects.",
       },
+      actions: [
+        "Choose one intention, one audio mode, and one variable to test.",
+        "Run a short low-volume session with the meditation timer.",
+        "Journal mood, focus, energy, sleep quality, stress, and context right after.",
+      ],
+      checks: [
+        "Keep volume comfortable and stop if the body gives a red signal.",
+        "Do not treat symbolic frequency labels as medical claims.",
+        "Compare only your own repeated sessions before changing variables.",
+      ],
+      signals: [
+        "Green: softer breathing and easier return of attention.",
+        "Yellow: restlessness or boredom worth noting.",
+        "Red: discomfort, dizziness, panic, or harsh volume means stop.",
+      ],
     },
   ]);
   const [journalDraft, setJournalDraft] = useState({
@@ -450,6 +470,45 @@ export function ResonanceLabApp() {
   );
   const todayKey = new Date().toISOString().slice(0, 10);
   const habitCheckedToday = habitCheckins.includes(todayKey);
+  const assistantGuideCards = [
+    {
+      title: "1. Intention",
+      detail: "Name the state you want to observe, such as calm focus, sleep preparation, or creative reset.",
+    },
+    {
+      title: "2. One variable",
+      detail: "Change only one thing: frequency preset, mode, volume, breath pace, or session length.",
+    },
+    {
+      title: "3. Signal check",
+      detail: "Watch green, yellow, and red body signals. Comfort matters more than finishing a timer.",
+    },
+    {
+      title: "4. Journal loop",
+      detail: "Record before and after state, then repeat before claiming a pattern.",
+    },
+  ];
+  const promptTemplates = [
+    {
+      label: "Calm focus",
+      prompt: `Build a ${activeProtocol.durationMinutes}-minute calm-focus experiment using ${modeLabels[mode]}. Tell me the intention, one variable, green/yellow/red signals, and journal fields.`,
+    },
+    {
+      label: "Sleep wind-down",
+      prompt:
+        "Create a gentle sleep wind-down session with low-volume audio, breath pacing, clear stop signals, and no medical claims.",
+    },
+    {
+      label: "Evidence check",
+      prompt:
+        "Review my current frequency idea. Separate research support, hypothesis, historical teaching, and user experience. Tell me what not to claim.",
+    },
+    {
+      label: "Next loop",
+      prompt:
+        "Use my current protocol and journal data to choose the next safest experiment loop, with one variable and a clear success note.",
+    },
+  ];
 
   const beginAudio = async () => {
     await start(layers, mode, binaural, isochronic, soundscape, relaxMusic);
@@ -630,14 +689,16 @@ export function ResonanceLabApp() {
     const latest = journalEntries.slice(0, 3);
     const summary =
       latest.length === 0
-        ? "I do not have journal entries yet. Suggest what to track after my next session."
+        ? "I do not have journal entries yet. Build my first baseline loop and tell me exactly what to track after the session."
         : latest
             .map(
               (entry) =>
-                `${entry.protocolTitle}: mood ${entry.moodBefore}->${entry.moodAfter}, focus ${entry.focus}, stress ${entry.stressPerception}`,
+                `${entry.protocolTitle}: mood ${entry.moodBefore}->${entry.moodAfter}, focus ${entry.focus}, energy ${entry.energy}, sleep ${entry.sleepQuality}, stress ${entry.stressPerception}, notes "${entry.notes || "none"}"`,
             )
             .join("; ");
-    setAssistantPrompt(`Analyze my recent journal entries cautiously: ${summary}`);
+    const analysisPrompt = `Analyze my recent journal entries cautiously. Show the loop, signals, safety checks, and one next experiment. Data: ${summary}`;
+    setAssistantPrompt(analysisPrompt);
+    void submitAssistantPrompt(analysisPrompt);
   };
 
   const createProtocol = () => {
@@ -675,8 +736,8 @@ export function ResonanceLabApp() {
     setJournalDraft((current) => ({ ...current, notes: "" }));
   };
 
-  const askAssistant = async () => {
-    const trimmedPrompt = assistantPrompt.trim();
+  const submitAssistantPrompt = async (promptOverride?: string) => {
+    const trimmedPrompt = (promptOverride ?? assistantPrompt).trim();
     if (!trimmedPrompt) return;
 
     const userMessage: AssistantMessage = {
@@ -708,7 +769,14 @@ export function ResonanceLabApp() {
         answer: string;
         provider: string;
         sections: Record<EvidenceLevel, string>;
+        actions?: string[];
+        checks?: string[];
+        signals?: string[];
       };
+
+      if (!response.ok) {
+        throw new Error(payload.answer || "Assistant request failed.");
+      }
 
       setAssistantMessages((current) => [
         ...current,
@@ -718,6 +786,9 @@ export function ResonanceLabApp() {
           content: payload.answer,
           provider: payload.provider,
           sections: payload.sections,
+          actions: payload.actions,
+          checks: payload.checks,
+          signals: payload.signals,
         },
       ]);
     } catch {
@@ -734,6 +805,10 @@ export function ResonanceLabApp() {
     } finally {
       setAssistantBusy(false);
     }
+  };
+
+  const askAssistant = () => {
+    void submitAssistantPrompt();
   };
 
   const renderModeControls = () => {
@@ -1734,38 +1809,114 @@ export function ResonanceLabApp() {
             </section>
 
             <section id="assistant" className="grid gap-5 rounded border border-white/10 bg-[var(--panel-bg)] p-5">
-              <div>
-                <p className="text-sm uppercase text-emerald-200">{copy.assistant}</p>
-                <h2 className="mt-1 text-2xl font-semibold text-white">
-                  Guardrailed experiment design and concept explanations
-                </h2>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm uppercase text-emerald-200">{copy.assistant}</p>
+                  <h2 className="mt-1 text-2xl font-semibold text-white">
+                    Ask, analyze, and design safer experiment loops
+                  </h2>
+                  <p className="mt-3 max-w-3xl text-slate-300">
+                    This assistant acts like a calm lab guide: it names the intention, checks the
+                    evidence lane, gives body-signal notes, and turns every answer into a repeatable
+                    session loop.
+                  </p>
+                </div>
+                <span className="rounded border border-amber-300/25 bg-amber-300/10 px-3 py-1 text-xs uppercase text-amber-100">
+                  Guidance, not treatment
+                </span>
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-                <div className="grid content-start gap-3">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {assistantGuideCards.map((card) => (
+                  <div key={card.title} className="rounded border border-white/10 bg-white/6 p-3">
+                    <div className="flex items-center gap-2 text-sm font-medium text-white">
+                      <Check size={15} />
+                      {card.title}
+                    </div>
+                    <p className="mt-2 text-sm text-slate-400">{card.detail}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
+                <div className="grid content-start gap-4">
                   <label className="grid gap-2 text-sm text-slate-300">
-                    <span>Prompt</span>
+                    <span className="flex items-center justify-between gap-3">
+                      <span>Prompt</span>
+                      <span className="text-xs text-slate-500">Ask for a loop, not a miracle.</span>
+                    </span>
                     <textarea
-                      className="min-h-40 rounded border border-white/10 bg-slate-950 px-3 py-2 text-white outline-none"
+                      className="min-h-44 rounded border border-white/10 bg-slate-950 px-3 py-2 text-white outline-none"
                       value={assistantPrompt}
                       onChange={(event) => setAssistantPrompt(event.target.value)}
                     />
                   </label>
-                  <ControlButton title="Ask assistant" onClick={askAssistant} variant="primary">
-                    <Bot size={16} />
-                    {assistantBusy ? "Thinking..." : copy.ask}
-                  </ControlButton>
-                  <ControlButton title="Analyze journal entries" onClick={requestJournalAnalysis}>
-                    <BookOpen size={16} />
-                    Analyze journal
-                  </ControlButton>
+
+                  <div className="grid gap-2">
+                    <div className="text-sm font-medium text-white">Prompt templates</div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {promptTemplates.map((template) => (
+                        <button
+                          key={template.label}
+                          type="button"
+                          onClick={() => setAssistantPrompt(template.prompt)}
+                          className="rounded border border-white/10 bg-white/6 px-3 py-2 text-left text-sm text-slate-200 transition hover:bg-white/10"
+                        >
+                          <span className="block font-medium text-white">{template.label}</span>
+                          <span className="text-xs text-slate-500">Load guided prompt</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <ControlButton
+                      title="Ask assistant"
+                      onClick={askAssistant}
+                      variant="primary"
+                      disabled={assistantBusy}
+                    >
+                      <Bot size={16} />
+                      {assistantBusy ? "Building loop..." : "Ask"}
+                    </ControlButton>
+                    <ControlButton
+                      title="Analyze journal entries"
+                      onClick={requestJournalAnalysis}
+                      disabled={assistantBusy}
+                    >
+                      <BookOpen size={16} />
+                      Analyze journal
+                    </ControlButton>
+                  </div>
+
                   <div className="rounded border border-white/10 bg-white/6 p-4 text-sm text-slate-300">
-                    The assistant must separate research, hypothesis, historical teaching, and user
-                    experience. It should not present speculation as fact.
+                    <div className="flex items-center gap-2 font-medium text-white">
+                      <FlaskConical size={16} />
+                      What the assistant will deliver
+                    </div>
+                    <div className="mt-3 grid gap-2">
+                      {[
+                        "A bounded session plan with one changed variable.",
+                        "A clear separation between research, hypothesis, tradition, and personal report.",
+                        "Green, yellow, and red signals for deciding whether to continue, soften, or stop.",
+                        "A journal loop that a first-time user can follow without guessing.",
+                      ].map((item) => (
+                        <div key={item} className="flex gap-2">
+                          <Check className="mt-0.5 shrink-0 text-emerald-200" size={14} />
+                          <span>{item}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid max-h-[640px] gap-3 overflow-auto pr-1">
+                <div className="grid max-h-[760px] gap-3 overflow-auto pr-1" aria-live="polite">
+                  {assistantBusy && (
+                    <div className="rounded border border-amber-300/25 bg-amber-300/10 p-3 text-sm text-amber-100">
+                      Checking the prompt, active protocol, audio settings, journal data, safety
+                      boundaries, and evidence labels.
+                    </div>
+                  )}
                   {assistantMessages.map((message) => (
                     <article
                       key={message.id}
@@ -1784,6 +1935,34 @@ export function ResonanceLabApp() {
                         )}
                       </div>
                       <p className="mt-3 text-sm text-slate-300">{message.content}</p>
+
+                      {message.role === "assistant" && (
+                        <div className="mt-4 grid gap-3">
+                          {[
+                            { title: "Next actions", items: message.actions, Icon: Check },
+                            { title: "Safety checks", items: message.checks, Icon: FlaskConical },
+                            { title: "Session signals", items: message.signals, Icon: Waves },
+                          ].map(({ title, items, Icon }) =>
+                            Array.isArray(items) && items.length > 0 ? (
+                              <div key={title} className="rounded border border-white/10 bg-white/6 p-3">
+                                <div className="flex items-center gap-2 text-xs font-semibold uppercase text-emerald-200">
+                                  <Icon size={14} />
+                                  {title}
+                                </div>
+                                <div className="mt-2 grid gap-2 text-sm text-slate-300">
+                                  {items.map((item) => (
+                                    <div key={item} className="flex gap-2">
+                                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" />
+                                      <span>{item}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null,
+                          )}
+                        </div>
+                      )}
+
                       {message.sections && (
                         <div className="mt-4 grid gap-2">
                           {(Object.entries(message.sections) as [EvidenceLevel, string][]).map(
