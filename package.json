@@ -12,6 +12,7 @@
     "lint": "eslint",
     "validate": "npm run lint && npm run build && npm run api:build",
     "smoke:visual": "node scripts/smoke-visual.mjs",
+    "smoke:workflow": "node scripts/smoke-workflow.mjs",
     "deploy:netlify": "npx netlify-cli deploy --build",
     "deploy:vercel": "npx vercel deploy",
     "deploy:preview": "npm run build"
